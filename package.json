@@ -15,9 +15,12 @@
   "main": "lib/index.js",
   "files": [
     "lib",
+    "launcher",
     "cordis.patch.yml",
     "README.md",
     "README.en.md",
+    "DESIGN.md",
+    "AGENTS.md",
     "LICENSE"
   ],
   "repository": {
