@@ -1,0 +1,8 @@
+# dsh-p2m (DSH-P2M / A 插件) bundle patch
+#
+# Mounts the plugin manager as the FIRST third-party loader entry.
+# The entry id `p2m` is reserved: DSH-P2M never disables it (self-heal,
+# see DESIGN §5.1 rule 1). Keep the id unchanged when editing.
+- insert:
+    - id: p2m
+      name: 'dsh-p2m'
