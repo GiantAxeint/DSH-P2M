@@ -232,3 +232,59 @@ DSH-safe v2 启动
 
 - **v1（本期交付）**：本设计全部落地 + 单测 + GitHub 仓库 `DSH-P2M` + 双语 README + 安装指引。
 - **v2（候选）**：`disabled: !!js ctx.p2m…` 动态开关；对接 dsh 官方插件 UI/CLI（`dsh plugin`）；更多 C7 保留资源规则与社区规则文件；多 profile 命名空间。
+
+---
+
+## 13. 补充需求 R5：下载即试用门禁（2026-09-05 追加，v1 一并交付）
+
+> 用户原话（整理）：**开启了本插件后，用户每一次下载插件，在真正开启前都要"试运行调用一次"；若该插件会导致崩溃，弹窗提示崩溃风险，提供「取消开启」与「无视风险继续使用」两个选项。**
+
+### 13.1 门禁流程
+
+```
+新插件到达（热挂载 / 运行期 loader 自动禁用后恢复 / 手动开启）
+        │
+        ▼
+① trial 试跑（lib/trial.js）：在【子进程】里 import 插件模块并 apply 一次
+        │  verdict = ok / crash / timeout
+        ▼
+ok ───────────────► 正常开启（不弹窗）
+crash / timeout ───► ② 风险弹窗（lib/dialog.js，两个选项）
+                       ├─「取消开启」→ 写 guard 隔离 + incident(user-cancelled)
+                       └─「无视风险继续使用」→ 不写 guard；尽力热开启，记
+                             incident(user-forced)；若再次崩溃且在冷却期内
+                             → 静默自动隔离（防弹窗风暴），记 force-failed
+```
+
+### 13.2 能力边界（诚实声明）
+
+- **试跑 = 子进程 import + apply**：能可靠捕获 import 期异常与 apply 期抛错（这是
+  绝大多数"一开就崩"的形态）；试跑进程崩溃/超时只影响它自己，绝不影响 DSH 主进程。
+- **试跑探针 ctx 是桩**（logger/on/provide 等为 noop）：插件若强依赖真服务且探针
+  不满足，可能误报"缺服务"。为此 verdict 增加 `unsupported`（探针不足/无法判定），
+  门禁对 `unsupported` 也弹窗但文案注明"无法判定"，默认建议取消（安全优先）。
+- **进程级硬崩溃**（OOM、native crash、主动 process.exit）进程内试跑挡不住：由
+  dsh-safe v2 启动熔断 + R5 弹窗之前的启动期隔离兜底（见 §6.4）。
+- **`dsh plugin add` 下载即重启的官方 CLI 流**：p2m 无法在重启前介入（插件体系如此），
+  该流崩溃由 dsh-safe 熔断+incident；R5 弹窗覆盖的是"热挂载/手动开启/恢复开启"等
+  p2m 可控入口。v2 计划通过钩子/包装命令覆盖官方 CLI 流。
+
+### 13.3 新增配置
+
+| key | 默认 | 说明 |
+| --- | --- | --- |
+| `autoGateRisk` | true | C2 恢复/手动开启前是否走试用门禁 |
+| `popupCooldownMs` | 120000 | 同一插件连续弹窗冷却（防风暴） |
+| `trialTimeoutMs` | 15000 | 试跑子进程超时 |
+| `ui` | 'auto' | 'auto'=优先桌面弹窗，失败默认取消；'none'=只记 incident 不弹窗（默认取消） |
+
+### 13.4 模块与测试
+
+- `lib/trial.js`：`runTrial(moduleAbsPath, config)` → `{verdict, detail}`；verdict ∈
+  ok/crash/timeout/unsupported。子进程实现（spawn node --input-type=module + file URL import）。
+- `lib/dialog.js`：`askCrashRisk(name, detail)` → `'cancel'|'force'`。Windows 桌面弹窗
+  （PowerShell WinForms 两按钮），失败或 `ui:'none'` 时默认 `'cancel'`。
+- `test/trial.test.mjs`：ok 夹具 apply 成功 → ok；crash 夹具 apply 抛错 → crash；
+  超时夹具（永不结束 apply）→ timeout。
+- 夹具：`test/fixtures/ok-plugin/`、`test/fixtures/crash-plugin/`、`test/fixtures/hang-plugin/`。
+- 弹窗 UI 无法自动化单测（需交互桌面），文档化 + `ui:'none'` 路径单测断言默认取消。
