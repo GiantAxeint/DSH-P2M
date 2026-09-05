@@ -1,7 +1,7 @@
 {
   "name": "dsh-p2m",
-  "version": "0.1.0",
-  "description": "DSH Plugin Management and Maintenance (DSH-P2M, aka A-plugin): unified plugin manager, conflict resolver and usage-based dynamic priority keeper for DeepSeek Harness (DSH) / Cordis.",
+  "version": "0.1.1",
+  "description": "DSH 插件管家：统一管理+冲突处理+按用时排序",
   "keywords": [
     "dsh",
     "dsh-plugin",
