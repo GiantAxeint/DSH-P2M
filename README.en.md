@@ -1,7 +1,9 @@
 # DSH-P2M (A-plugin) · DSH Plugin Management and Maintenance
 
+**English** | [**中文**](./README.md)
+
 > A plugin-manager plugin for [DeepSeek Harness (DSH)](https://www.npmjs.com/package/@deepseek-ai/dsh) (Cordis runtime).
-> English README (this file) · 中文文档见 [README.md](./README.md) · Design & internals: [DESIGN.md](./DESIGN.md)
+> Design & internals: [DESIGN.md](./DESIGN.md)
 
 `DSH core > A-plugin > other plugins (dynamically ordered by cumulative usage time)` — that is the priority order DSH-P2M maintains.
 

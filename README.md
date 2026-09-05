@@ -1,9 +1,9 @@
 # DSH-P2M（A 插件）· DSH 插件管理与维护
 
-> **DSH Plugin Management and Maintenance** —— 为 [DeepSeek Harness (DSH)](https://www.npmjs.com/package/@deepseek-ai/dsh)（Cordis 运行时）打造的"插件管理器"插件。
-> 中文文档见本文件；English: [README.en.md](./README.en.md) · 设计与原理: [DESIGN.md](./DESIGN.md)
+[**English**](./README.en.md) | **中文**
 
-**> A plugin-manager plugin for DeepSeek Harness (DSH/Cordis): unified lifecycle control of all plugins, automatic conflict detection & resolution, fixed priority `DSH core > A-plugin > others` with **dynamic ordering by cumulative usage time**, and a "trial-before-enable" gate that runs each new plugin in a child process and pops a two-option dialog (Cancel enable / Ignore risk & continue) when it would crash.**
+> **DSH Plugin Management and Maintenance** —— 为 [DeepSeek Harness (DSH)](https://www.npmjs.com/package/@deepseek-ai/dsh)（Cordis 运行时）打造的"插件管理器"插件。
+> 设计与原理: [DESIGN.md](./DESIGN.md)
 
 `DSH 本体 > A 插件 > 其他插件（按累计使用时长动态排序）` —— 这就是 DSH-P2M 维护的优先级。
 
