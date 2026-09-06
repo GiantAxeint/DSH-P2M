@@ -25,7 +25,7 @@
 - **配置层合并顺序**（后者覆盖前者）：profile `cordis.yml`(空) ← 各 bundle 的 `cordis.patch.yml` ← 用户 `cordis.patch.yml` ← `--patch` 启动覆盖层（guard 文件）。
 - **运行时管理 API（热调度）**：`ctx.loader.create/update/remove/resolve/locate/await`；`update(id, opts)` 支持改 `disabled`、换 `name`、移动位置。**注意**：root tree 的 `write()` 是 no-op —— 运行时改动只在内存生效，**要跨重启持久必须写 guard/patch 文件**。
 - **崩溃归因**：loader 抛 `failed to <import|apply|dispose> loader entry <id> (<name>): <detail>`；dsh-safe 据此提取 `<id>`。
-- **插件模块写法**：`module.exports = { name, apply }`（CJS）或 ESM `export default { name, apply }`；loader `unwrapExports` 兼容。A 插件本体用 **ESM、零运行时依赖**（自带 YAML 子集解析器，见 `lib/yaml-min.js`）。
+- **插件模块写法**：`module.exports = { name, apply }`（CJS）或 ESM `export default { name, apply }`；loader `unwrapExports` 兼容。P2M 本体用 **ESM、零运行时依赖**（自带 YAML 子集解析器，见 `lib/yaml-min.js`）。
 
 ## 纪律摘要（agent-coding-discipline 五律）
 

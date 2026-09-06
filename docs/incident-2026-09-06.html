@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DSH 插件冲突事件复盘（2026-09-05 ~ 09-06）</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --ink:#1c2733; --sub:#5a6b7b; --line:#dfe5ec;
+    --accent:#2563eb; --accent-soft:#e8f0fe; --ok:#0f7a4d; --ok-soft:#e3f4ec;
+    --warn:#b45309; --warn-soft:#fdf1e0; --danger:#b91c1c; --danger-soft:#fdeaea;
+    --code-bg:#f0f3f7;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;line-height:1.75;padding:32px 16px}
+  .wrap{max-width:920px;margin:0 auto}
+  header.hero{background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;border-radius:16px;padding:32px 36px;margin-bottom:24px}
+  header.hero h1{font-size:26px;line-height:1.4;margin-bottom:8px}
+  header.hero .meta{opacity:.85;font-size:14px}
+  .badge{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);padding:2px 10px;border-radius:999px;font-size:12px;margin-right:6px}
+  h2{font-size:19px;margin:34px 0 14px;padding-left:12px;border-left:4px solid var(--accent)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 24px;margin-bottom:16px}
+  .verdict{display:flex;gap:12px;align-items:flex-start}
+  .verdict .tag{flex:none;width:64px;text-align:center;font-size:13px;font-weight:600;border-radius:8px;padding:4px 0;margin-top:2px}
+  .tag.t-danger{background:var(--danger-soft);color:var(--danger)}
+  .tag.t-ok{background:var(--ok-soft);color:var(--ok)}
+  .tag.t-warn{background:var(--warn-soft);color:var(--warn)}
+  .tag.t-info{background:var(--accent-soft);color:var(--accent)}
+  .verdict b{font-size:15px}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+  th{background:#eef2f7;font-weight:600;white-space:nowrap}
+  code{background:var(--code-bg);border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-family:Consolas,"Courier New",monospace;font-size:13px;word-break:break-all}
+  pre{background:#0f172a;color:#dbeafe;border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:12.5px;line-height:1.6;margin:10px 0}
+  pre code{background:none;border:none;color:inherit;padding:0}
+  .timeline{position:relative;margin:8px 0 8px 6px;padding-left:26px}
+  .timeline::before{content:"";position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:var(--line)}
+  .tl-item{position:relative;margin-bottom:18px}
+  .tl-item::before{content:"";position:absolute;left:-26px;top:7px;width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:0 0 0 2px var(--accent)}
+  .tl-item .t{font-weight:600}
+  .tl-item .d{font-size:12px;color:var(--sub);margin:2px 0 4px}
+  ul,ol{margin:8px 0 8px 22px}
+  li{margin:5px 0}
+  .callout{border-radius:8px;padding:10px 16px;margin:10px 0;font-size:14px}
+  .callout.ok{background:var(--ok-soft);border-left:4px solid var(--ok)}
+  .callout.warn{background:var(--warn-soft);border-left:4px solid var(--warn)}
+  .callout.danger{background:var(--danger-soft);border-left:4px solid var(--danger)}
+  .callout.info{background:var(--accent-soft);border-left:4px solid var(--accent)}
+  .improve{display:grid;gap:12px}
+  .imp{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:14px 18px;background:#fff}
+  .imp .no{display:inline-block;background:var(--accent);color:#fff;font-size:12px;font-weight:600;border-radius:6px;padding:1px 8px;margin-right:8px}
+  .imp .stage{font-size:12px;color:var(--sub)}
+  footer{margin-top:28px;color:var(--sub);font-size:12.5px;text-align:center}
+  .row2{display:flex;gap:12px;flex-wrap:wrap}
+  .row2 .cell{flex:1;min-width:260px}
+  @media (max-width:640px){header.hero{padding:24px 20px}header.hero h1{font-size:21px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>DSH 插件冲突事件复盘</h1>
+  <div class="meta">
+    <span class="badge">事件窗口 2026-09-05 ~ 09-06</span>
+    <span class="badge">三次连续启动崩溃</span>
+    <span class="badge">环境 Windows / DSH (Cordis) / pnpm profile web</span>
+  </div>
+</header>
+
+<!-- ============ 摘要 ============ -->
+<div class="card">
+  <h2 style="margin-top:0;border-left-color:var(--accent)">一句话摘要</h2>
+  <p>三天内 DSH 连续三次启动闪退，表象各异（<b>缺包 → API 导出缺失 → 同名服务重复注册</b>），是<b>三层不同根因</b>叠加：一次依赖树损坏、一次 dsh 生态 API 版本漂移、一次第三方全家桶插件与官方内置插件的服务冲突。每次都以「报错原文 → 本机实证 → 最小修复」闭环解决；最后一次冲突与 <b>插件冲突管家（P2M）</b> 要治理的领域直接相关，暴露了 P2M 可落地的改进方向。</p>
+</div>
+
+<!-- ============ 时间线 ============ -->
+<div class="card">
+  <h2 style="margin-top:0">事件时间线</h2>
+  <div class="timeline">
+    <div class="tl-item"><div class="t">09-05 16:20 · 依赖树损坏（事故）</div>
+      <div class="d">profile 的 <code>node_modules/.pnpm</code> 被清空，顶层 <code>@deepseek-ai/</code> 变空壳；lockfile 同步丢失 <code>dsh-settings</code> 实体解析。</div></div>
+    <div class="tl-item"><div class="t">09-06 上午 · 第 1 次崩溃</div>
+      <div class="d"><code>pnpm install</code> 两次「成功」但崩点不变 → 揭穿 pnpm 状态文件信任快路径。</div></div>
+    <div class="tl-item"><div class="t">09-06 · 第 2 次崩溃</div>
+      <div class="d">强制重建 231 包后仍崩 → 真因浮出：<code>dsh-settings</code> API 版本漂移（<code>settingsNamespace</code> 导出被新版移除）。</div></div>
+    <div class="tl-item"><div class="t">09-06 · 第 3 次崩溃（本次核心）</div>
+      <div class="d">钉回兼容版 <code>dsh-settings@0.1.1-rc.2</code> 后，<code>@morlay/session-rdb</code> 终于能加载 → 与官方 JSONL 后端抢注同名服务 <code>sessionPersistence</code> → Cordis 拒绝。</div></div>
+  </div>
+</div>
+
+<!-- ============ 第一幕 ============ -->
+<div class="card">
+  <h2 style="margin-top:0">第一幕 · 依赖树损坏（已修复）</h2>
+  <div class="verdict"><span class="tag t-danger">崩因①</span>
+    <div><b>node_modules 实体被抹除，只剩「装过的记忆」</b>
+      <p style="margin-top:6px">证据：<code>.pnpm</code> 仅剩 <code>lock.yaml</code>（mtime 09-05 16:20）；顶层 <code>@deepseek-ai/</code> 空壳；而 <code>pnpm-lock.yaml</code>、<code>package.json</code>、全局 store（758MB）均完好。</p>
+      <p><b>为什么越修越糟：</b>pnpm 以 <code>.modules.yaml</code> + lockfile 判断「是否 up to date」，不 stat 磁盘实体 → 普通 <code>pnpm install</code> 永远走快路径跳过，实体永不补齐。</p>
+      <div class="callout ok"><b>修复：</b><code>ren node_modules node_modules.bak-…</code>（改名备份而非删除）→ <code>pnpm install</code> 强制重建，231 包从 store 硬链，7.4s 完成。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 第二幕 ============ -->
+<div class="card">
+  <h2 style="margin-top:0">第二幕 · dsh-settings API 版本漂移（已修复）</h2>
+  <div class="verdict"><span class="tag t-danger">崩因②</span>
+    <div><b>模块「找到了」但版本不对 → 报 export 缺失而非 MODULE_NOT_FOUND</b>
+      <p style="margin-top:6px">崩溃点：<code>@morlay/session-rdb@0.0.11</code> 按旧 API 写：<code>import { settingsNamespace } from "@deepseek-ai/dsh-settings"</code>。</p>
+      <ul>
+        <li><b>它要的版本</b>：peer <code>^0.1.1-rc.2</code> —— 该版本<b>确有</b> <code>settingsNamespace</code>（下载 tarball 实证）；</li>
+        <li><b>实际解析到的</b>：profile 本地实体丢失后，Node 一路爬升命中<b>全局 CLI 内置</b>的 <code>dsh-settings@0.1.2-alpha.3</code> —— 该版本已移除该导出（改为 <code>SettingsProvider</code> 等）；</li>
+        <li><b>诱因</b>：9-05 那次损坏把 lockfile 中 <code>dsh-settings</code> 的 resolution 条目弄丢（只剩 peer 声明）→ 重装永不安装它。</li>
+      </ul>
+      <div class="callout ok"><b>修复：</b>profile 显式 <code>pnpm add @deepseek-ai/dsh-settings@0.1.1-rc.2</code> → 本地实体 + lockfile resolution 齐备 → Node 解析改命中本地兼容版。经验：报「does not provide an export」≠ 缺包，是解析目标版本错；用 <code>createRequire(...).resolve()</code> 实证解析路径。</div>
+      <div class="callout warn"><b>上游注：</b>morlay 在 <code>session-rdb@0.0.13</code> 已适配新 API（peer 改 <code>^0.1.2-rc.1</code>）——pre-1.0 生态 API 破坏性变更频繁，是此坑的温床。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 第三幕（核心） ============ -->
+<div class="card">
+  <h2 style="margin-top:0">第三幕 · sessionPersistence 服务重名冲突（本次核心，已修复）</h2>
+  <div class="verdict"><span class="tag t-danger">崩因③</span>
+    <div><b>两个会话持久化后端同时注册同名 Cordis 服务</b>
+      <p style="margin-top:6px">报错：<code>service "sessionPersistence" has been registered at &lt;JsonlSessionPersistence&gt;</code></p>
+      <table>
+        <tr><th>冲突方</th><th>身份</th><th>提供者</th><th>注册服务</th></tr>
+        <tr><td>官方 <code>session-persistence-jsonl</code></td><td>dsh-base 内置默认后端</td><td>JsonlSessionPersistence</td><td rowspan="2"><code>sessionPersistence</code>（同名 → Cordis 拒绝重复注册）</td></tr>
+        <tr><td><code>web-ui-session-rdb</code></td><td>web-all 全家桶经 @morlay/better-session 引入的 RDB/SQLite 后端</td><td>SessionPersistenceRdb</td></tr>
+      </table>
+      <p><b>关键证据（定位到根因的决定性一步）：</b></p>
+      <ul>
+        <li>web-all 聚合 patch（<code>cordis.patch.yml</code>，AUTO-GENERATED）末尾自带注释与默认值：<pre><code># inactive by default: the rows above ship disabled, so the stock persistence
+# backend keeps serving sessions until you opt in.
+- id: web-ui-session-branch
+  disabled: true
+- id: web-ui-session-rdb
+  disabled: true
+- id: web-ui-conversation-message-actions
+  disabled: true</code></pre>
+        morlay RDB 后端<b>出厂即禁用</b>——官方 JSONL 继续服务会话，要换 RDB 需显式 opt-in；</li>
+        <li>但 profile 层 <code>cordis.patch.yml</code> 为了开启全家桶 UI，把所有 <code>web-ui-*</code> 整批设为 <code>disabled: false</code>，把这三个休眠条目也唤醒了 → 双后端抢注同名服务。</li>
+      </ul>
+      <div class="callout ok"><b>修复（已执行，备份 <code>cordis.patch.yml.bak-20260906-113229</code>）：</b>把 <code>web-ui-session-branch / web-ui-session-rdb / web-ui-conversation-message-actions</code> 三行改回 <code>disabled: true</code>，其余 20 项全家桶 UI 一概不动。</div>
+      <div class="callout warn"><b>若确实要用 RDB 会话存储：</b>正确姿势是「二选一」——三件套置 <code>false</code> 并追加 <code>- id: session-persistence-jsonl / disabled: true</code> 停用官方 JSONL 后端，而非两个都开。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 三幕小结 ============ -->
+<div class="card">
+  <h2 style="margin-top:0">三幕小结：为什么每次都「看似无解」</h2>
+  <table>
+    <tr><th>幕</th><th>表象</th><th>误导方向</th><th>破局手段</th></tr>
+    <tr><td>①</td><td>缺包报错</td><td>「再 pnpm install 一次」</td><td>读 <code>.modules.yaml</code>，识破状态文件信任快路径</td></tr>
+    <tr><td>②</td><td>export 缺失</td><td>「包没装全」</td><td><code>createRequire.resolve()</code> 实证解析目标 = 全局 CLI 旧版</td></tr>
+    <tr><td>③</td><td>服务重复注册</td><td>「依赖又坏了」</td><td>读三方 patch 层，发现「出厂禁用被用户层覆盖」</td></tr>
+  </table>
+  <div class="callout info"><b>共同教训：</b>DSH pre-1.0 的 loader 补丁层 + pnpm 状态文件 + API 快速漂移三者叠加，任何「凭经验重试」都会踩空；每次都要回到<b>文件系统与源码实证</b>。</div>
+</div>
+
+<!-- ============ P2M 改进建议 ============ -->
+<div class="card">
+  <h2 style="margin-top:0">对插件冲突管家（P2M）的改进建议 <span style="font-size:13px;font-weight:400;color:var(--warn)">（方案待授权，尚未改代码）</span></h2>
+  <p>本次事件中有两幕（② 版本漂移、③ 同名服务）正是 P2M 声称治理的「插件冲突」范畴，但现有检测面覆盖不到。以下为具体可落地改进点，按优先级排序：</p>
+  <div class="improve">
+    <div class="imp"><span class="no">E1</span><b>同名服务注册预检（新冲突类 C7）</b>
+      <div class="stage">涉及 lib/conflicts.js · 对应本次第三幕</div>
+      <p style="margin-top:6px">静态扫描每个 entry 目标包入口的 Cordis 服务注册面（<code>super(ctx, "…")</code> / <code>new Service("…")</code> 等），检测「不同 entry 提供同名 service」并提前报告——本次 <code>sessionPersistence</code> 双注册在启动前即可被识别为高风险冲突。</p></div>
+    <div class="imp"><span class="no">E2</span><b>依赖解析路径留痕（resolve 快照）</b>
+      <div class="stage">涉及 lib/state.js · 对应本次第二幕</div>
+      <p style="margin-top:6px">每次对账/崩溃时记录各 entry 的 <code>require.resolve</code> 实际解析路径与版本；一旦出现「本地缺失 → 爬升到全局 CLI」这类解析漂移，incident 里直接可见，不用事后逐级排查。</p></div>
+    <div class="imp"><span class="no">E3</span><b>peer 版本合规预检（启动前体检 preflight）</b>
+      <div class="stage">涉及新增 lib/preflight.js + launcher/dsh-safe.mjs · 对应本次第二幕</div>
+      <p style="margin-top:6px">v2 启动器在拉起 DSH 前调用 P2M 静态体检：核对每个 entry 声明的 peerDependencies 区间与实际解析版本，版本越界即告警/给出钉版本命令——把「启动即崩」前移到「启动前报告」。</p></div>
+    <div class="imp"><span class="no">E4</span><b>profile 层覆盖感知</b>
+      <div class="stage">涉及 lib/conflicts.js / lib/policy.js · 对应本次第三幕</div>
+      <p style="margin-top:6px">检测到同 id 或同服务冲突时，读取 profile 顶层 <code>cordis.patch.yml</code> 中相关条目的 <code>disabled</code> 覆盖状态，直接输出「二选一」修复建议（本次就是「全开清单覆盖了出厂禁用」），而不是只报告冲突本身。</p></div>
+    <div class="imp"><span class="no">E5</span><b>冲突速查表与文档同步扩展</b>
+      <div class="stage">涉及 DESIGN.md / README.md</div>
+      <p style="margin-top:6px">C7 类入冲突矩阵；README 冲突类型速查表补「同名服务 / 版本漂移」两行；沉淀本次「pnpm 状态文件信任」与「export 缺失 ≠ 缺包」两条排障心法进 AGENTS.md。</p></div>
+    <div class="imp"><span class="no">E6</span><b>（非代码）上游反馈</b>
+      <div class="stage">dsh 生态协作</div>
+      <p style="margin-top:6px">web-all 聚合脚本把 better-session 的 insert 行与「出厂禁用」行拆开生成、导致 opt-in 语义割裂；<code>dsh-settings</code> 破坏性改名无迁移提示。可代用户起草 issue 反馈给 @linxin666 / @deepseek-ai。</p></div>
+  </div>
+  <div class="callout warn" style="margin-top:14px"><b>待授权：</b>以上 E1–E5 涉及 lib/ 代码与文档改动，按约定先列方案，获授权后再动手。</div>
+</div>
+
+<!-- ============ 附录 ============ -->
+<div class="card">
+  <h2 style="margin-top:0">附录 · 关键文件与备份</h2>
+  <table>
+    <tr><th>对象</th><th>路径</th><th>状态</th></tr>
+    <tr><td>修复后的 profile 补丁</td><td><code>~/.dsh/profiles/web/cordis.patch.yml</code></td><td>三件套已置 disabled:true</td></tr>
+    <tr><td>改动前备份</td><td><code>~/.dsh/profiles/web/cordis.patch.yml.bak-20260906-113229</code></td><td>可回滚</td></tr>
+    <tr><td>依赖损坏备份</td><td><code>~/.dsh/profiles/web/node_modules.bak-20260906-1108/</code></td><td>重建后可删（删除需确认）</td></tr>
+    <tr><td>钉回的兼容版本</td><td><code>dsh-settings@0.1.1-rc.2</code>（已入 profile deps + lockfile）</td><td>勿用 <code>pnpm install</code> 冲掉</td></tr>
+    <tr><td>P2M 状态目录</td><td><code>~/.dsh/p2m/</code>（guard / usage / incidents / state）</td><td>正常运行</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--sub)">复盘依据：本机文件系统实证 + registry tarball 导出面对比 + 三方 cordis.patch.yml 原文；所有结论均有命令级证据，非推测。</p>
+</div>
+
+<footer>插件冲突管家（P2M）· 事件复盘文档 · 2026-09-06 生成</footer>
+</div>
+</body>
+</html>

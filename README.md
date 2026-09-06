@@ -1,11 +1,10 @@
-# DSH-P2M（A 插件）· DSH 插件管理与维护
+# 插件冲突管家（P2M）
 
 [**English**](./README.en.md) | **中文**
 
-> **DSH Plugin Management and Maintenance** —— 为 [DeepSeek Harness (DSH)](https://www.npmjs.com/package/@deepseek-ai/dsh)（Cordis 运行时）打造的"插件管理器"插件。
-> 设计与原理: [DESIGN.md](./DESIGN.md)
+**插件冲突管家（P2M）：统一管理插件启停、检测并裁决插件冲突、按使用时长动态维护优先级。**
 
-`DSH 本体 > A 插件 > 其他插件（按累计使用时长动态排序）` —— 这就是 DSH-P2M 维护的优先级。
+> 仓库与包标识沿用 `DSH-P2M` / `dsh-p2m`（技术标识不变）；P2M 为本插件对外昵称。
 
 ---
 
@@ -13,11 +12,11 @@
 
 插件装多了以后的三类痛点：
 
-| 痛点 | DSH-P2M 的做法 |
+| 痛点 | P2M 的做法 |
 | --- | --- |
 | 没有统一管理 | 一处登记/启停/隔离/恢复所有插件，决策写入**唯一的 guard 文件**，跨重启生效 |
 | 冲突只能被动熔断 | 检测（启动崩溃归因 / 运行期自动禁用 / 静态补丁扫描）→ 按优先级裁决 → 留痕、可回滚 |
-| 没有优先级概念 | 恒定 `DSH > A 插件 > 其他`；其他插件按**累计使用时长**实时排序：B 用得比 C 久，维护顺序就是 `DSH > A > B > C > …` |
+| 没有优先级概念 | 恒定 `DSH > P2M > 其他`；其他插件按**累计使用时长**实时排序：B 用得比 C 久，维护顺序就是 `DSH > P2M > B > C > …` |
 
 **补充能力（v1 含）**：下载后"真实开启前先试跑"——新插件启用前在子进程里试运行一次；会崩就弹窗给两个选项：**「取消开启」/「无视风险继续使用」**。
 
@@ -25,19 +24,19 @@
 
 ```
 tier 0  DSH 本体      （name 以 @deepseek-ai/ 开头，或配置的 coreEntryIds）
-tier 1  A 插件自身     （entry id: p2m，自杀免疫：guard 里出现自己会被自动移除）
+tier 1  P2M 自身      （entry id: p2m，自杀免疫：guard 里出现自己会被自动移除）
 tier 2  其他插件       （按 usage.json 累计使用毫秒降序 = 维护优先级）
 
 铁律：任何决策永不禁用 tier0/tier1；同层冲突牺牲"用时短者"。
 ```
 
-动态示例（对应需求）：台账 `B=12h, C=5h, D=2h` → 顺序 `DSH → A → B → C → D`；B 继续用、C 停用使 `D=3h > C=5h` 变 `C=5h,D=3h` → 顺序变为 `DSH → A → B → D → C`。
+动态示例（对应需求）：台账 `B=12h, C=5h, D=2h` → 顺序 `DSH → P2M → B → C → D`；B 继续用、C 停用使 `D=3h > C=5h` 变 `C=5h,D=3h` → 顺序变为 `DSH → P2M → B → D → C`。
 
 ## 工作原理（一页速览）
 
 - DSH 插件 = Cordis loader entry：每个插件是 npm 包，`cordis.patch.yml` 声明挂载行。
 - 配置按层合并，`--patch` 覆盖层（guard 文件）最后生效，**禁用心最强**。
-- DSH-P2M 用 loader 热管理 API（`create/update/remove`）做运行期调度；root 树的 `write()` 是 no-op，所以**每次决策双写**：guard（持久，重启有效）+ 运行时热更新（即时生效）。
+- P2M 用 loader 热管理 API（`create/update/remove`）做运行期调度；root 树的 `write()` 是 no-op，所以**每次决策双写**：guard（持久，重启有效）+ 运行时热更新（即时生效）。
 - 详细设计（冲突分类矩阵、guard 协议、数据格式、边界）见 [DESIGN.md](./DESIGN.md)。
 
 ## 安装
@@ -55,15 +54,15 @@ dsh plugin --profile web add github:GiantAxeint/DSH-P2M
 1. 把本仓库放到任意目录（如 `E:\DeepseekHome\Plugin\DSH-P2M`）。
 2. 编辑 profile 的 `package.json`（Windows 示例：`%USERPROFILE%\.dsh\profiles\web\package.json`）：
    - `dependencies` 增加：`"dsh-p2m": "link:E:/DeepseekHome/Plugin/DSH-P2M"`
-   - `dsh.profile.bundles` 数组**开头**插入 `"dsh-p2m"`（保证它最先加载，体现 `DSH > A` 顺序）。
+   - `dsh.profile.bundles` 数组**开头**插入 `"dsh-p2m"`（保证它最先加载，体现 `DSH > P2M` 顺序）。
 3. 在 profile 目录执行 `pnpm install`（DSH 用 pnpm workspace）。
 4. 重启 DSH（推荐用下方的 v2 启动器）。
 
-> A 插件的 entry id 固定为 `p2m`，**请勿改动**（guard 自愈机制依赖它）。
+> P2M 的 entry id 固定为 `p2m`，**请勿改动**（guard 自愈机制依赖它）。
 
 ### 升级启动器（推荐，接管并升级 dsh-safe）
 
-仓库内 `launcher/dsh-safe.mjs` 是 v2 启动器：**纯启动监督**（崩溃时只做紧急隔离），canonical guard 迁移到 `<DSH_HOME>/p2m/plugin-guard.yml` 并与 A 插件共用锁/备份协议，崩溃事件写入同一份 `incidents.jsonl`。把该文件复制覆盖你原来的 `dsh-safe.mjs` 即可（旧文件会先备份）。Windows 一键脚本：
+仓库内 `launcher/dsh-safe.mjs` 是 v2 启动器：**纯启动监督**（崩溃时只做紧急隔离），canonical guard 迁移到 `<DSH_HOME>/p2m/plugin-guard.yml` 并与 P2M 共用锁/备份协议，崩溃事件写入同一份 `incidents.jsonl`。把该文件复制覆盖你原来的 `dsh-safe.mjs` 即可（旧文件会先备份）。Windows 一键脚本：
 
 ```
 scripts\install-safe.cmd
@@ -71,7 +70,7 @@ scripts\install-safe.cmd
 
 ## 使用
 
-A 插件启动后自动工作；状态与数据落在 `<DSH_HOME>/p2m/`（默认 `~/.dsh/p2m/`）：
+P2M 启动后自动工作；状态与数据落在 `<DSH_HOME>/p2m/`（默认 `~/.dsh/p2m/`）：
 
 | 文件 | 内容 |
 | --- | --- |
@@ -134,7 +133,7 @@ node --test test/*.test.mjs   # 50 个用例：guard/ledger/priority/conflicts/p
 
 ```
 DSH-P2M/
-├─ lib/            A 插件本体（ESM，零运行时依赖）
+├─ lib/            P2M 本体（ESM，零运行时依赖）
 │  ├─ index.js     入口：ctx.p2m 服务、采样、对账、门禁
 │  ├─ guard.js     guard 唯一写者（锁+备份+迁移）
 │  ├─ yaml-min.js  自带 loader 补丁方言 YAML 解析器
@@ -151,7 +150,7 @@ DSH-P2M/
 
 ## 安全与边界（诚实声明）
 
-- A 插件**零运行时依赖**（连 yaml 解析都自带），自己不会制造依赖冲突。
+- P2M **零运行时依赖**（连 yaml 解析都自带），自己不会制造依赖冲突。
 - 涉及 DSH 本体与自身的决策永远只报告、不自动禁用；guard 出现自身会自愈。
 - 试跑能捕获 import/apply 级崩溃；把整个进程炸掉级别的硬崩溃由 dsh-safe 启动熔断兜底。
 - 官方 `dsh plugin add` 是"下载即重启"流，p2m 无法在重启前介入该流（由 v2 启动器熔断+incident 接管）；热挂载/手动恢复等 p2m 可控入口已全部接入试用门禁。
