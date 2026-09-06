@@ -86,6 +86,7 @@ P2M works automatically once loaded. State lives under `<DSH_HOME>/p2m/` (defaul
 | `scanConflicts()` | Run one static+runtime conflict scan (report only) |
 | `enable(id)` / `disable(id)` | Restore / disable (enable goes through the trial gate; protected ids cannot be disabled) |
 | `trial(id)` | Manual child-process dry run → verdict ok/crash/timeout/unsupported |
+| `preflight()` | Run one peer-version preflight (E3) → findings + summary |
 | `reconcile()` / `sample()` | Manual reconcile / sampling tick |
 
 ### Trial gate
@@ -106,7 +107,10 @@ P2M works automatically once loaded. State lives under `<DSH_HOME>/p2m/` (defaul
 | `trialTimeoutMs` | 15000 | child-process trial timeout |
 | `coreNamePrefixes` | ['@deepseek-ai/'] | DSH-core detection prefixes |
 | `coreEntryIds` | [] | extra DSH-core entry ids |
-| `patchLayers` | [] | extra patch files for `scanConflicts()` |
+| `knownCoreServices` | ['sessionPersistence'] | C7 known engine-core service list (set [] to silence) |
+| `preflightOnBoot` | true | E3: run peer preflight at boot (report only) |
+| `scanBootLayers` | true | E4: static-scan all patch layers at boot |
+| `patchLayers` | [] | extra patch files for `scanConflicts()` (auto-discovered by default) |
 
 ## Conflict types at a glance
 
@@ -114,16 +118,20 @@ P2M works automatically once loaded. State lives under `<DSH_HOME>/p2m/` (defaul
 | --- | --- | --- |
 | C1 boot crash | boot fails matching `failed to … loader entry` | dsh-safe v2 emergency isolate + audit |
 | C2 runtime auto-disable | loader disabled an entry, not persisted | trial: conflict→isolate; self-crash→dialog |
-| C3 config clash | layers give one id different configs | report (manual fix) |
+| C3 config clash | layers give one id different configs (incl. factory-disabled overridden by profile) | report + either-or advice (manual fix) |
 | C4/C5 duplicate id / duplicate module name | structural | report (manual fix) |
 | C6 self/privilege violation | guard names p2m/core | self-heal removal + audit |
+| C7 same-name service registration | two plugins would register the same cordis service (or collide with engine-core defaults like `sessionPersistence`) | pre-boot preflight report + either-or advice |
+| version drift (preflight) | peer range vs actually-resolved version mismatch (local dep missing → climbs to a stale global CLI copy) | pre-boot report + pin command (`DSH_P2M_PREFLIGHT=block` to refuse boot) |
+
+> Resolve-path drift (E2): every reconcile records each plugin's `require.resolve` destination + version; a drift writes a `resolve-drift` audit and persists into `state.json#lastResolve`.
 
 ## Tests
 
 Zero-dependency unit tests (`node:test`):
 
 ```bash
-node --test test/*.test.mjs   # 50 cases: guard/ledger/priority/conflicts/policy/yaml/trial
+node --test test/*.test.mjs   # 74 cases: guard/ledger/priority/conflicts/policy/yaml/trial/C7/preflight/resolve
 ```
 
 ## Layout
@@ -136,8 +144,9 @@ DSH-P2M/
 │  ├─ yaml-min.js  bundled loader-patch-dialect YAML parser
 │  ├─ ledger.js    usage ledger (pure tick())
 │  ├─ priority.js  tiers & dynamic ordering
-│  ├─ conflicts.js conflict detection (static+runtime)
+│  ├─ conflicts.js conflict detection (static+runtime+C7 service preflight)
 │  ├─ policy.js    decision engine
+│  ├─ preflight.js peer-version preflight (E3, zero-dep semver subset)
 │  ├─ trial.js     child-process dry run (R5)
 │  └─ dialog.js    two-button crash-risk dialog (R5)
 ├─ launcher/       dsh-safe v2 boot supervisor (copy over old one)

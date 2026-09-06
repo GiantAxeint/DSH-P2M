@@ -89,6 +89,7 @@ P2M 启动后自动工作；状态与数据落在 `<DSH_HOME>/p2m/`（默认 `~/
 | `scanConflicts()` | 立即做一轮静态+运行期冲突扫描（只报告） |
 | `enable(id)` / `disable(id)` | 恢复/禁用（恢复前会走试用门禁；protected 不可禁用） |
 | `trial(id)` | 手动子进程试跑一次，返回 verdict（ok/crash/timeout/unsupported） |
+| `preflight()` | 跑一轮 peer 版本体检（E3），返回 findings + summary |
 | `reconcile()` / `sample()` | 手动触发对账 / 采样 |
 
 ### 试用门禁（下载即试跑）
@@ -109,7 +110,10 @@ P2M 启动后自动工作；状态与数据落在 `<DSH_HOME>/p2m/`（默认 `~/
 | `trialTimeoutMs` | 15000 | 试跑子进程超时 |
 | `coreNamePrefixes` | ['@deepseek-ai/'] | DSH 本体识别前缀 |
 | `coreEntryIds` | [] | DSH 本体额外 entry id |
-| `patchLayers` | [] | `scanConflicts()` 额外扫描的补丁文件 |
+| `knownCoreServices` | ['sessionPersistence'] | C7 引擎核心默认服务名单快照（置 [] 关闭该告警） |
+| `preflightOnBoot` | true | E3：boot 时跑 peer 版本体检（只报告） |
+| `scanBootLayers` | true | E4：boot 静态扫描全补丁层（自动发现） |
+| `patchLayers` | [] | `scanConflicts()` 额外扫描的补丁文件（缺省自动发现） |
 
 ## 冲突类型速查
 
@@ -117,16 +121,20 @@ P2M 启动后自动工作；状态与数据落在 `<DSH_HOME>/p2m/`（默认 `~/
 | --- | --- | --- |
 | C1 启动崩溃 | 启动失败命中 `failed to … loader entry` | dsh-safe v2 紧急隔离 + incident |
 | C2 运行期自动禁用 | loader 把某 entry 置 disabled 未持久化 | 试跑判定：冲突→隔离；自崩→弹窗 |
-| C3 同 id 配置互踩 | 多层补丁对同一 id 给不同配置 | 报告（需人工） |
-| C4/C5 重复 id / 同名模块 | 结构性问题 | 报告（需人工） |
+| C3 同 id 配置互踩 | 多层补丁对同一 id 给不同配置（含「出厂禁用被 profile 覆盖」形态） | 报告 + 二选一建议（需人工） |
+| C4/C5 重复 id / 同名模块 | 结构性重复 | 报告（需人工） |
 | C6 自杀/越权 | guard 出现 p2m/core | 自愈移除 + incident |
+| C7 同名服务注册 | 不同插件会注册同一 cordis 服务（或撞引擎核心默认服务，如 `sessionPersistence`） | 启动前预检报告 + 二选一建议 |
+| 版本漂移（preflight） | peer 声明区间 vs 实际解析版本越界（典型：本地缺失爬升到全局 CLI 旧版） | 启动前体检报告 + 钉版本命令（`DSH_P2M_PREFLIGHT=block` 可拒启） |
+
+> 解析漂移（E2）：每次对账记录各插件 `require.resolve` 实际落点与版本，漂移写 `resolve-drift` incident 并持久化进 `state.json#lastResolve`。
 
 ## 测试
 
 零依赖单测（`node:test`）：
 
 ```bash
-node --test test/*.test.mjs   # 50 个用例：guard/ledger/priority/conflicts/policy/yaml/trial
+node --test test/*.test.mjs   # 74 个用例：guard/ledger/priority/conflicts/policy/yaml/trial/C7/preflight/resolve
 ```
 
 ## 目录结构
@@ -139,8 +147,9 @@ DSH-P2M/
 │  ├─ yaml-min.js  自带 loader 补丁方言 YAML 解析器
 │  ├─ ledger.js    使用时长台账（纯函数 tick）
 │  ├─ priority.js  分层与动态排序
-│  ├─ conflicts.js 冲突检测（静态+运行期）
+│  ├─ conflicts.js 冲突检测（静态+运行期+C7 服务注册预检）
 │  ├─ policy.js    裁决引擎
+│  ├─ preflight.js 启动前 peer 版本体检（E3，零依赖 semver 子集）
 │  ├─ trial.js     子进程试跑（R5）
 │  └─ dialog.js    崩溃风险双按钮弹窗（R5）
 ├─ launcher/       dsh-safe v2 纯启动监督器（复制覆盖旧版）
@@ -154,6 +163,18 @@ DSH-P2M/
 - 涉及 DSH 本体与自身的决策永远只报告、不自动禁用；guard 出现自身会自愈。
 - 试跑能捕获 import/apply 级崩溃；把整个进程炸掉级别的硬崩溃由 dsh-safe 启动熔断兜底。
 - 官方 `dsh plugin add` 是"下载即重启"流，p2m 无法在重启前介入该流（由 v2 启动器熔断+incident 接管）；热挂载/手动恢复等 p2m 可控入口已全部接入试用门禁。
+
+## 版本与改进记录（2026-09-06）
+
+| 版本 | 内容 |
+| --- | --- |
+| v0.1.3（E1） | C7 同名服务注册预检（含一跳依赖包溯源 + known-core 二选一告警） |
+| v0.1.4（E2） | 解析路径留痕：resolve 快照 + 漂移 incident |
+| v0.1.5（E3） | 启动前 peer 版本体检（p2m boot + launcher 内嵌，`DSH_P2M_PREFLIGHT=block` 可拒启） |
+| v0.1.6（E4） | profile 层覆盖感知：出厂禁用被覆盖 → 二选一建议；C4 误报修正；boot 静态扫描全补丁层 |
+| v0.1.6（E5） | 本文档体系同步（DESIGN §14 / 速查表 / AGENTS 心法 / 复盘 HTML） |
+
+> 完整背景与逐项说明见 [docs/incident-2026-09-06.html](./docs/incident-2026-09-06.html)（冲突事件复盘）与 [DESIGN.md](./DESIGN.md#14-事件驱动增强-e1e5)。
 
 ## License
 

@@ -27,6 +27,15 @@
 - **崩溃归因**：loader 抛 `failed to <import|apply|dispose> loader entry <id> (<name>): <detail>`；dsh-safe 据此提取 `<id>`。
 - **插件模块写法**：`module.exports = { name, apply }`（CJS）或 ESM `export default { name, apply }`；loader `unwrapExports` 兼容。P2M 本体用 **ESM、零运行时依赖**（自带 YAML 子集解析器，见 `lib/yaml-min.js`）。
 
+## 排障心法（2026-09-06 冲突事件沉淀，勿凭经验重试）
+
+> 完整复盘：`docs/incident-2026-09-06.html`（三次启动崩溃：缺包 → API 漂移 → 同名服务冲突）。已落地的对应观测能力：E1 C7 预检、E2 resolve 快照、E3 peer preflight、E4 覆盖感知（见 DESIGN §14）。
+
+1. **pnpm 状态文件信任快路径**：`pnpm install` 判定"是否 up to date"只看 `.modules.yaml` + lockfile，**不 stat 磁盘实体**。若 `.pnpm/` 实体被抹掉而 lockfile 完好，普通 `pnpm install` 永远走快路径、实体永不补齐（报错会一直"看似无解"）。修复：先把 `node_modules` **改名备份**（不要删）再 `pnpm install` 强制重建。
+2. **"export 缺失 / does not provide an export" ≠ 缺包**：很可能是解析目标版本不对——profile 本地实体丢失后 Node 沿目录**向上爬升**命中全局 CLI 内置包（如 dsh-settings@0.1.2-alpha.3 移除旧导出）。排查用 `createRequire(path.join(profileDir, '__p2m__.cjs')).resolve(spec)` 实证解析落点与版本；修复：在 profile 显式钉版本（`pnpm add <spec>@<兼容版>`）让本地实体优先。
+3. **"service X has been registered" ≠ 依赖又坏了**：是补丁层把**出厂默认 disabled 的条目**（常是"默认后端替代品"，如 morlay RDB 三件套）通过 profile 整批 `disabled:false` 唤醒了。修复是**二选一**：改回 disabled:true，或连官方默认后端一并禁用——不要两个都开。
+4. cordis 服务注册字面量只有两类：Service 子类 `super(ctx, name)` 与 `ctx.provide(name, …)`；名字常写在一跳依赖基类包里（`sessionPersistence` 实际在 `@deepseek-ai/dsh-session-persistence`）——所以 C7 扫描连带扫一跳依赖包。
+
 ## 纪律摘要（agent-coding-discipline 五律）
 
 1. 版本/API 先行：引依赖先查官方（本项目刻意零依赖，见 DESIGN 第 12 节）。

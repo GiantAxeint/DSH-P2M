@@ -132,18 +132,24 @@ B 继续用、C 停用一周后：DSH → p2m(A) → B? C 不变排序…台账�
 | --- | --- | --- | --- |
 | C1 启动崩溃 | boot 失败，stderr 命中 `failed to … loader entry <id>` | 启动期 | 启动器归因（复用 dsh-safe 逻辑）→ 事件写入 incidents + 按策略隔离 |
 | C2 运行期 apply 失败 | 某 entry apply 抛错，loader 自动 `disabled:true`（`entry.ts` case7） | 运行期 | p2m 监听 `loader/partial-dispose` / 周期 diff 树状态 |
-| C3 同 id 配置互踩 | ≥2 层补丁对同一 entry id 给了**不同 config**（后者覆盖前者，静默丢配置） | 任意时点（扫描） | 静态扫描各层 patch：同 id 冲突检测 |
-| C4 同层重复 id | 同一补丁数组内两个 entry 同 id | 任意时点（扫描） | 静态扫描 |
+| C3 同 id 配置互踩 | ≥2 层补丁对同一 entry id 给了**不同 config**（后者覆盖前者，静默丢配置） | 任意时点（扫描） | 静态扫描各层 patch：同 id 冲突检测。覆盖形态含 **E4 出厂默认被覆盖**（insert `disabled:true` ← overlay `disabled:false`，直接给二选一建议） |
+| C4 同层重复 id | 同一补丁数组内两个 entry **同形态**重复（两个 insert 或两个 overlay；insert+overlay 同现是合法习语） | 任意时点（扫描） | 静态扫描（2026-09-06 起按形态分组，web-all 全家桶不再误报） |
 | C5 重复 name | 两个不同 id 指向同一模块 | 任意时点（扫描） | 静态扫描（可配置 ignore） |
 | C6 自杀/越权 | guard 中出现 p2m/core 自己的行 | 启动自检 / 每次读 guard | 自愈：删除该行 + incident |
-| C7 端口/保留资源互踩 | 多个插件 patch 同一系统服务（如 webserver port） | 扫描（可配置 key 规则） | C3 的特例，按 config 冲突上报 |
+| C7 同名服务注册 | 两个将启用 entry 会向 cordis 注册**同一 service**（`super(ctx,'x')` / `provide('x')` / 一跳依赖包），或撞 DSH 引擎核心默认服务 | 启动前（扫描） | E1：扫描入口包 + 一跳依赖包源码里的注册字面量；known-core 服务名单命中给二选一告警 |
+
+> 注：端口/保留资源互踩（早期草案里的"C7 端口"）= **C3 的特例**：对 `knownSystemKeys`（如 webserver 端口、`web-ui-*` 保留 key）的 config 冲突按 C3 上报。2026-09-06 起 C7 编号让给**同名服务注册**（事件第三幕），见 [docs/incident-2026-09-06.html](docs/incident-2026-09-06.html)。
 
 ### 6.2 检测引擎（conflicts.js）
 
-- `scanStatic(layers, opts)`：输入各层 patch（解析自 yaml-min / 或已注入的对象），输出 `Conflict[]`：`{kind, layerIds[], entryId, name, detail, severity: error|warn, evidence}`。不修改任何东西。
+- `scanStatic(layers, opts)`：输入各层 patch（解析自 yaml-min / 或已注入的对象），输出 `Conflict[]`：`{kind, layerIds[], entryId, name, detail, severity: error|warn, evidence, advice?}`。不修改任何东西。
 - `observeRuntime(ctx)`：订阅事件 + 定时 diff，把 C2 归一化成与静态冲突同构的 `Conflict`，进队列。
+- `scanServiceClashes(entries, opts)`（C7，E1）：静态扫描将启用 entry 的服务注册面。注册字面量形态依据 cordis 源码实证仅两类——Service 子类 `super(ctx, name)` 与 `ctx.provide(name, …)`；名字常写在一跳依赖的基类包（如 `sessionPersistence` 在 `@deepseek-ai/dsh-session-persistence`），故默认连带扫一跳 `dependencies/peerDependencies` 包。`knownCoreServices` 命中给二选一告警。局限（诚实声明）：动态拼接名/符号键 static provide/多跳依赖形态扫不到。
+- 运行时 patch 层自动发现（E4）：`<profile>/cordis.patch.yml` + profile `package.json#dependencies` 各 bundle 的 `cordis.patch.yml`（`loadPatchLayers()`，按 `path.resolve` 去重），boot 时静态扫描一轮，仅记录 error/带 advice 项。
 
 ### 6.3 裁决引擎（policy.js）—— 核心流程
+
+- 结构类冲突（C3/C4/C5/C7）一律只报告；报告结果携带 `advice`（若扫描给出二选一修复建议），由 index 层写入 incident 并打印。
 
 ```
 onConflict(c):
@@ -207,7 +213,12 @@ DSH-safe v2 启动
 | `autoIsolate` | true | 运行期是否自动隔离（false=只报告） |
 | `coreNamePrefixes` | `['@deepseek-ai/']` | core tier 识别前缀 |
 | `coreEntryIds` | `[]` | core tier 额外 id 名单 |
-| `knownSystemKeys` | `['webserver','web-ui-*']` | C7 保留资源 key 规则 |
+| `knownSystemKeys` | `['webserver','web-ui-*']` | 端口/保留资源互踩（C3 特例）key 规则 |
+| `knownCoreServices` | `['sessionPersistence']` | C7 引擎核心默认服务名单快照（置 `[]` 关闭该告警；随引擎演进增删） |
+| `c7ScanIntervalMs` | 300000 | C7 静态文件扫描节流（默认 5 分钟；entry 集变化即失效重扫） |
+| `preflightOnBoot` | true | E3：boot 时对 profile 全部 bundle 跑 peer 版本体检（只报告不阻塞） |
+| `scanBootLayers` | true | E4：boot 时静态扫描全补丁层，仅记录 error/带建议项 |
+| `patchLayers` | `[]` | `scanConflicts()` 额外补丁文件；缺省自动发现（profile + 各 bundle patch） |
 
 ---
 
@@ -231,7 +242,8 @@ DSH-safe v2 启动
 ## 12. 路线图
 
 - **v1（本期交付）**：本设计全部落地 + 单测 + GitHub 仓库 `DSH-P2M` + 双语 README + 安装指引。
-- **v2（候选）**：`disabled: !!js ctx.p2m…` 动态开关；对接 dsh 官方插件 UI/CLI（`dsh plugin`）；更多 C7 保留资源规则与社区规则文件；多 profile 命名空间。
+- **v0.1.3–0.1.6（2026-09-06 事件后增强，已交付）**：E1 C7 同名服务预检；E2 resolve 快照；E3 peer preflight；E4 profile 覆盖感知 —— 详见 §14。
+- **v2（候选）**：`disabled: !!js ctx.p2m…` 动态开关；对接 dsh 官方插件 UI/CLI（`dsh plugin`）；更多保留资源 key 与社区规则文件；多 profile 命名空间。
 
 ---
 
@@ -288,3 +300,21 @@ crash / timeout ───► ② 风险弹窗（lib/dialog.js，两个选项）
   超时夹具（永不结束 apply）→ timeout。
 - 夹具：`test/fixtures/ok-plugin/`、`test/fixtures/crash-plugin/`、`test/fixtures/hang-plugin/`。
 - 弹窗 UI 无法自动化单测（需交互桌面），文档化 + `ui:'none'` 路径单测断言默认取消。
+
+---
+
+## 14. 事件驱动增强 E1–E5（2026-09-06 落地，来自 9-05~06 冲突事件复盘）
+
+> 触发：`docs/incident-2026-09-06.html`（三幕启动崩溃复盘）。E1–E5 为仓库内代码/文档增强，已随 v0.1.3–0.1.6 发布；E6 为上游 issue 反馈，见仓库 issues 区与复盘文档。
+
+| # | 内容 | 主要涉及 | 行为入口 | 验证（全仓单测） |
+| --- | --- | --- | --- | --- |
+| E1 | C7 同名服务注册预检 | `lib/conflicts.js`、`lib/policy.js`、`lib/index.js` | reconcile 节流重扫 + `ctx.p2m.scanConflicts()`；known-core 命中 → 二选一告警 | `test/c7-service-clash.test.mjs`（7 例） |
+| E2 | 解析路径留痕（resolve 快照 + 漂移 incident） | `lib/state.js`、`lib/index.js` | boot 记快照 → 每次对账比对；漂移写 `resolve-drift` incident 并落 `state.json#lastResolve` | `test/e2-resolve-snapshot.test.mjs`（5 例） |
+| E3 | 启动前 peer 版本体检 | 新增 `lib/preflight.js`、`lib/index.js`、`launcher/dsh-safe.mjs` | p2m boot 体检（只报告）+ `ctx.p2m.preflight()`；launcher spawn 前体检，`DSH_P2M_PREFLIGHT=block` 可拒启 | `test/e3-preflight.test.mjs`（7 例） |
+| E4 | profile 层覆盖感知 | `lib/conflicts.js`、`lib/index.js` | 出厂 disabled:true 被 overlay disabled:false 覆盖 → 识别 + 二选一 advice；boot 静态扫描全补丁层（自动发现 + 去重） | `test/e4-profile-override.test.mjs`（5 例） |
+| E5 | 冲突矩阵/README 速查表/AGENTS 排障心法/文档同步 | `DESIGN.md`、`README*.md`、`AGENTS.md`、复盘 HTML | — | — |
+
+**E1–E4 附带的行为修正**：incident 去重（同类静态冲突只记一次，防 30s 对账刷屏）；C4 收紧为"同形态重复"，insert+overlay 合法习语不再误报；`resolve-drift`/`preflight-failed`/`static-conflict` 三种新 incident kind 进入 `incidents.jsonl` 字典。
+
+**设计说明**：E3 的 semver 判定遵循 npm prerelease 同元组规则（候选带 prerelease 时，仅当区间含同 `[major.minor.patch]` 元组的 prerelease 比较器才可能命中——这正是 `0.1.2-alpha.3 ∉ ^0.1.1-rc.2` 的依据）。launcher 内嵌一份最小实现以维持单文件分发，改动需与 `lib/preflight.js` 同步。
