@@ -1,5 +1,7 @@
 # 插件冲突管家（P2M）· Plugin Conflict Manager for DSH
 
+[![DSH Market](https://raw.githubusercontent.com/2BingLing/dsh-market/master/assets/readme/badge-listed-en.svg)](https://dsh.market/)
+
 **English** | [**中文**](./README.md)
 
 **DSH Plugin Conflict Manager (P2M): pre-empts crash-causing conflicts — duplicate service registration, peer version drift, patch override clashes — isolates the offending plugin and ranks plugins by cumulative usage time, alongside unified enable/disable control and dynamic maintenance priority.**

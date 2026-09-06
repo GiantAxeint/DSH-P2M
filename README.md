@@ -1,5 +1,7 @@
 # 插件冲突管家（P2M）
 
+[![DSH Market](https://raw.githubusercontent.com/2BingLing/dsh-market/master/assets/readme/badge-listed-zh.svg)](https://dsh.market/)
+
 [**English**](./README.en.md) | **中文**
 
 **DSH 冲突管家（P2M）：自动拦截会让 DSH 闪退的同名服务注册、版本漂移、补丁覆盖冲突，按用时排序并隔离肇事插件；同时统一管理插件启停、动态维护优先级。**
