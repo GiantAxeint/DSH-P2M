@@ -76,6 +76,19 @@ P2M works automatically once loaded. State lives under `<DSH_HOME>/p2m/` (defaul
 | `incidents.jsonl` | Append-only audit trail (conflicts / isolates / restores / dialog decisions) |
 | `state.json` | p2m state (boot counter, snapshots) |
 
+### Boot log: what "boot #N" means
+
+Every time DSH starts and loads P2M, the log shows a line with a number N (e.g. `boot #11`):
+
+```
+[p2m] boot #11 | guard=<...> | autoIsolate=true
+```
+
+- **`#N` is not a level or phase** — it is the **machine-wide cumulative count of successful boot runs**. The counter lives in `state.json#bootCount`, incremented by 1 on every boot and never reset (restarts after a crash or repeated in-process loads also bump it, so it ≈ "number of startups", not an exact process count).
+- **Every boot does exactly the same work regardless of N**: read state → self-heal immunity (remove p2m/core entries from the guard if present) → capture a dependency resolve snapshot (E2) → run the peer-version preflight (E3) → static-scan all patch layers (E4) → print this line.
+- **How to use it when debugging**: N increasing steadily means P2M is running on every startup; if N did not change between two startups, P2M was not loaded at all that time (disabled / not enabled). When an incident happens, align N with the `incidents.jsonl` timeline (e.g. "crashed on boot #11" → inspect incidents around that boot).
+- **Reset the counter**: delete the `bootCount` field (or the whole file) from `state.json` — P2M recreates it automatically; guard/usage/incidents are untouched.
+
 ### ctx.p2m API
 
 | Method | Purpose |

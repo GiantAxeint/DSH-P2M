@@ -79,6 +79,19 @@ P2M 启动后自动工作；状态与数据落在 `<DSH_HOME>/p2m/`（默认 `~/
 | `incidents.jsonl` | 冲突/隔离/恢复/弹窗决策的追加流水（append-only） |
 | `state.json` | p2m 自身状态（boot 计数、快照等） |
 
+### 启动日志：`boot #N` 是什么意思
+
+每次 DSH 启动加载 P2M 时，日志里会出现一行（N 为数字，例如 `boot #11`）：
+
+```
+[p2m] boot #11 | guard=<...> | autoIsolate=true
+```
+
+- **`#N` 不是等级或阶段**，而是**本机累计第 N 次成功执行 boot 例程**——计数器存于 `state.json#bootCount`，每次 boot +1、只增不减（崩溃后的重启、进程内重复加载也会 +1，因此它≈“启动次数”，不精确等于进程数）。
+- **每次 boot 做的事与 N 无关，完全一样**：读 state → 自杀免疫（guard 若含 p2m 自身/核心条目则移除）→ 记一版依赖解析快照（E2）→ 跑 peer 版本体检 preflight（E3）→ 静态扫描全补丁层（E4）→ 打印本行。
+- **排查时怎么用**：N 连续递增 = P2M 每次启动都在正常工作；若两次启动间 N 不变，说明那次 P2M 根本没被加载（被禁用/未启用）；事故发生时可用 N 对齐 `incidents.jsonl` 的时间线（例如「第 11 次启动崩」→ 看该次 boot 前后的流水）。
+- **清零重计**：删掉 `state.json` 中的 `bootCount` 字段或整个文件即可（P2M 自动重建，不影响 guard/usage/incidents）。
+
 ### ctx.p2m API（运行期可调）
 
 | 方法 | 作用 |
