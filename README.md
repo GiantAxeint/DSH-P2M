@@ -79,7 +79,7 @@ P2M 启动后自动工作；状态与数据落在 `<DSH_HOME>/p2m/`（默认 `~/
 | `incidents.jsonl` | 冲突/隔离/恢复/弹窗决策的追加流水（append-only） |
 | `state.json` | p2m 自身状态（boot 计数、快照等） |
 
-### 启动日志：`boot #N` 是什么意思
+### 启动日志：`boot #N` 
 
 每次 DSH 启动加载 P2M 时，日志里会出现一行（N 为数字，例如 `boot #11`）：
 
