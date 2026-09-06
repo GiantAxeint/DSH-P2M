@@ -15,6 +15,10 @@
 //     3. Protected ids (default: p2m itself) are NEVER isolated: if the boot
 //        crash names a protected id we give up loudly instead of shooting
 //        ourselves in the foot.
+//     4. E3 preflight (inlined minimal subset; canonical logic in lib/preflight.js)
+//        checks every profile bundle's peerDependencies against the actually
+//        resolved versions BEFORE spawning, prints violations with pin commands;
+//        set DSH_P2M_PREFLIGHT=block to abort the boot on any violation.
 //
 // Migration: on first run an old v1 guard next to this file
 // (plugin-guard.yml in the same directory) is merged into the canonical file.
@@ -26,6 +30,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const HOME = os.homedir()
@@ -34,6 +39,7 @@ const STATE_ROOT = path.join(DSH_HOME, 'p2m')
 const GUARD_FILE = process.env.DSH_P2M_GUARD_FILE || path.join(STATE_ROOT, 'plugin-guard.yml')
 const INCIDENT_FILE = path.join(STATE_ROOT, 'incidents.jsonl')
 const LEGACY_GUARD = path.join(__dirname, 'plugin-guard.yml') // v1 file next to launcher
+const PROFILE_DIR = path.join(DSH_HOME, 'profiles', process.env.DSH_PROFILE || 'web')
 
 const BOOT_WAIT_MS = 12000 // 判定 "boot OK" vs "crashed" 的窗口
 const MAX_ATTEMPTS = 5
@@ -122,6 +128,131 @@ function appendIncident(entry) {
   fs.appendFileSync(INCIDENT_FILE, JSON.stringify({ ts: Date.now(), source: 'launcher', ...entry }) + '\n', 'utf8')
 }
 
+// ============ E3 启动前 peer 体检（最小实现，内嵌以保持单文件分发） ============
+// 能力对齐 lib/preflight.js 的 satisfies 子集（^ ~ >= <= > < =、AND/OR、prerelease
+// 同元组规则）。改动本函数时请同步 lib/preflight.js，避免两处语义漂移。
+
+function pvParse(raw) {
+  const m = String(raw ?? '').trim().match(/^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?/)
+  return m ? { n: [Number(m[1]), Number(m[2] ?? 0), Number(m[3] ?? 0)], pre: m[4] ?? '' } : null
+}
+function pvCompare(a, b) {
+  const va = pvParse(a); const vb = pvParse(b)
+  if (!va || !vb) return NaN
+  for (let i = 0; i < 3; i++) if (va.n[i] !== vb.n[i]) return va.n[i] < vb.n[i] ? -1 : 1
+  if (va.pre === vb.pre) return 0
+  if (!va.pre) return 1
+  if (!vb.pre) return -1
+  const as = va.pre.split('.'); const bs = vb.pre.split('.')
+  for (let i = 0; i < Math.max(as.length, bs.length); i++) {
+    if (as[i] === undefined) return -1
+    if (bs[i] === undefined) return 1
+    const an = /^\d+$/.test(as[i]); const bn = /^\d+$/.test(bs[i])
+    if (an && bn) { const d = Number(as[i]) - Number(bs[i]); if (d) return d < 0 ? -1 : 1 }
+    else if (an !== bn) return an ? -1 : 1
+    else if (as[i] !== bs[i]) return as[i] < bs[i] ? -1 : 1
+  }
+  return 0
+}
+function evCmp(version, op, target) {
+  const c = pvCompare(version, target)
+  if (Number.isNaN(c)) return false
+  if (op === '>') return c > 0
+  if (op === '>=') return c >= 0
+  if (op === '<') return c < 0
+  if (op === '<=') return c <= 0
+  return c === 0
+}
+function satisfiesMini(version, range) {
+  const r = String(range ?? '').trim()
+  if (!r || r === '*') return true
+  const cand = pvParse(version)
+  if (!cand) return false
+  const evalGroup = (group) => {
+    const parts = group.split(/[\s,]+/).filter(Boolean)
+    if (!parts.length) return true
+    const comparators = []
+    let rangeHasPre = false
+    for (const part of parts) {
+      const m = part.match(/^(>=|<=|>|<|=|\^|~)?\s*(.+)$/)
+      if (!m) return false
+      let op = m[1] || '='; let t = m[2]
+      if (op === '^' || op === '~') {
+        const tv = pvParse(t)
+        if (!tv) return false
+        const [mj, mn, pt] = tv.n
+        const upper = op === '^'
+          ? (mj > 0 ? `${mj + 1}.0.0` : mn > 0 ? `0.${mn + 1}.0` : `0.0.${pt + 1}`)
+          : `${mj}.${mn + 1}.0`
+        if (tv.pre) rangeHasPre = true
+        comparators.push({ op: '>=', target: t }, { op: '<', target: upper })
+        continue
+      }
+      if (t.startsWith('=')) { op = '='; t = t.slice(1) }
+      const tv = pvParse(t)
+      if (!tv) return false
+      if (tv.pre) rangeHasPre = true
+      comparators.push({ op, target: t })
+    }
+    if (cand.pre && !rangeHasPre) return false
+    if (cand.pre && rangeHasPre) {
+      const tuple = `${cand.n[0]}.${cand.n[1]}.${cand.n[2]}`
+      const same = comparators.some((c) => {
+        const t = pvParse(c.target)
+        return !!t?.pre && `${t.n[0]}.${t.n[1]}.${t.n[2]}` === tuple
+      })
+      if (!same) return false
+    }
+    return comparators.every((c) => evCmp(version, c.op, c.target))
+  }
+  return String(range).split('||').some((g) => evalGroup(g))
+}
+
+function preflightProfile() {
+  const profilePkgFile = path.join(PROFILE_DIR, 'package.json')
+  if (!fs.existsSync(profilePkgFile)) return { findings: [], summary: { checked: 0, ok: 0, error: 0, warn: 0 } }
+  let deps = {}
+  try { deps = JSON.parse(fs.readFileSync(profilePkgFile, 'utf8')).dependencies ?? {} } catch { return { findings: [], summary: { checked: 0, ok: 0, error: 0, warn: 0 } } }
+  const req = createRequire(path.join(PROFILE_DIR, '__p2m_resolve__.cjs'))
+  const findings = []
+  const summary = { checked: 0, ok: 0, error: 0, warn: 0 }
+  // 解析 spec → {dir, pkg}；不可解析返回 null
+  const locatePkg = (spec) => {
+    try {
+      let file = req.resolve(spec)
+      let dir = file
+      for (;;) {
+        const pf = path.join(dir, 'package.json')
+        if (fs.existsSync(pf)) return { dir, pkg: JSON.parse(fs.readFileSync(pf, 'utf8')) }
+        const parent = path.dirname(dir)
+        if (parent === dir) return null
+        dir = parent
+      }
+    } catch { return null }
+  }
+  for (const [spec] of Object.entries(deps)) {
+    const bundle = locatePkg(spec)
+    if (!bundle?.pkg?.peerDependencies) continue
+    for (const [peer, declared] of Object.entries(bundle.pkg.peerDependencies)) {
+      const d = String(declared)
+      if (/^(github|git|file:|link:|workspace:|http)/.test(d) || !/\d/.test(d)) continue
+      const actual = locatePkg(peer)
+      summary.checked++
+      const resolved = actual?.pkg?.version ?? null
+      if (!resolved) {
+        findings.push({ level: 'error', bundle: spec, peer, declared: d, resolved: null, fix: `pnpm --dir "${PROFILE_DIR}" add ${peer}@${d}` })
+        summary.error++
+      } else if (satisfiesMini(resolved, d)) {
+        summary.ok++
+      } else {
+        findings.push({ level: 'error', bundle: spec, peer, declared: d, resolved, fix: `pnpm --dir "${PROFILE_DIR}" add ${peer}@${d}` })
+        summary.error++
+      }
+    }
+  }
+  return { findings, summary }
+}
+
 function migrateLegacyIfNeeded() {
   if (!fs.existsSync(LEGACY_GUARD)) return
   const legacy = readGuardIds(LEGACY_GUARD)
@@ -171,6 +302,25 @@ async function main() {
   migrateLegacyIfNeeded()
   console.log('[dsh-safe] currently disabled plugins:', readGuardIds(GUARD_FILE).length
     ? readGuardIds(GUARD_FILE).join(', ') : '(none)')
+
+  // E3：启动前 peer 体检（默认只报告；DSH_P2M_PREFLIGHT=block 时存在 error 即拒绝启动）
+  console.log('[dsh-safe] preflight: checking peerDependencies of profile bundles (E3)...')
+  const pre = preflightProfile()
+  console.log(`[dsh-safe] preflight: checked ${pre.summary.checked} peers | ok ${pre.summary.ok} | errors ${pre.summary.error}`)
+  const preErrors = pre.findings.filter((f) => f.level === 'error')
+  for (const f of preErrors) {
+    console.warn(`[dsh-safe] preflight ✗ ${f.bundle} peer ${f.peer}: declared ${f.declared}, resolved ${f.resolved ?? '(none)'}`)
+    console.warn(`    fix: ${f.fix}`)
+  }
+  if (process.env.DSH_P2M_PREFLIGHT === 'block' && preErrors.length) {
+    appendIncident({
+      kind: 'preflight-block',
+      entryId: preErrors.map((f) => f.bundle).join(','),
+      detail: preErrors.slice(0, 8).map((f) => `${f.bundle} peer ${f.peer}: declared ${f.declared} vs ${f.resolved ?? '(none)'}`).join('; '),
+    })
+    console.error('[dsh-safe] DSH_P2M_PREFLIGHT=block: refusing to start until peer violations are pinned.')
+    process.exit(1)
+  }
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     if (attempt > 1) {
