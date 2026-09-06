@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-page-node-id="LDPG1cqNidr5mwLXBWLJzp">
-<head data-page-node-id="P0SL7pUB84tWBrsgMhGA5Z">
-<meta charset="UTF-8" data-page-node-id="cfvdncCdXiIgmIE2MN48CH">
-<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="EPype3HJG3lOxj60opE8gH">
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DSH 插件冲突事件复盘（2026-09-05 ~ 09-06）</title>
 <style>
   :root{
@@ -57,83 +57,83 @@
   @media (max-width:640px){header.hero{padding:24px 20px}header.hero h1{font-size:21px}}
 </style>
 </head>
-<body data-page-node-id="IvaNYqhN3i5clCNTgHByQx">
-<div class="wrap" data-page-node-id="IxFbEdZFOzm37naVKwItwE">
+<body>
+<div class="wrap">
 
-<header class="hero" data-page-node-id="WUsn4WaUzFxDmBBg24537T">
-  <h1 data-page-node-id="m47XqMRboEA8vB1hYgwmPM">DSH 插件冲突事件复盘</h1>
-  <div class="meta" data-page-node-id="BBNIPfFOU6CGXg90CYg7TL">
-    <span class="badge" data-page-node-id="JSx4j2edwPAIVnlPVFWB7n">事件窗口 2026-09-05 ~ 09-06</span>
-    <span class="badge" data-page-node-id="GPZUDs1YWD2EGlBSyCVfre">三次连续启动崩溃</span>
-    <span class="badge" data-page-node-id="gcTD1T5FJz03guUOyQdf4B">环境 Windows / DSH (Cordis) / pnpm profile web</span>
-    <span class="badge" data-page-node-id="MAXtkU5IFgvLLrAnXAnoFh">改进 E1–E6 已全部落地</span>
+<header class="hero">
+  <h1>DSH 插件冲突事件复盘</h1>
+  <div class="meta">
+    <span class="badge">事件窗口 2026-09-05 ~ 09-06</span>
+    <span class="badge">三次连续启动崩溃</span>
+    <span class="badge">环境 Windows / DSH (Cordis) / pnpm profile web</span>
+    <span class="badge">改进 E1–E6 已全部落地</span>
   </div>
 </header>
 
 <!-- ============ 摘要 ============ -->
-<div class="card" data-page-node-id="DpuLTmRbaDfVqI8BViBDVA">
-  <h2 style="margin-top:0;border-left-color:var(--accent)" data-page-node-id="nYTFgaaPJk67AIFMQD0dOk">一句话摘要</h2>
-  <p data-page-node-id="OLHUJb5qyIFLnkwCf1nLRj">三天内 DSH 连续三次启动闪退，表象各异（<b data-page-node-id="c6tvuqbkUObM5rC4wmWaKK">缺包 → API 导出缺失 → 同名服务重复注册</b>），是<b data-page-node-id="zFHkgvcSrjcixD6mBIsvVq">三层不同根因</b>叠加：一次依赖树损坏、一次 dsh 生态 API 版本漂移、一次第三方全家桶插件与官方内置插件的服务冲突。每次都以「报错原文 → 本机实证 → 最小修复」闭环解决；最后一次冲突与 <b data-page-node-id="PfHqoneQiJ0NRAJ8KyfbsM">插件冲突管家（P2M）</b> 要治理的领域直接相关，暴露了 P2M 可落地的改进方向——该方向已逐条实施为 E1–E6（见文末落地记录）。</p>
+<div class="card">
+  <h2 style="margin-top:0;border-left-color:var(--accent)">一句话摘要</h2>
+  <p>三天内 DSH 连续三次启动闪退，表象各异（<b>缺包 → API 导出缺失 → 同名服务重复注册</b>），是<b>三层不同根因</b>叠加：一次依赖树损坏、一次 dsh 生态 API 版本漂移、一次第三方全家桶插件与官方内置插件的服务冲突。每次都以「报错原文 → 本机实证 → 最小修复」闭环解决；最后一次冲突与 <b>插件冲突管家（P2M）</b> 要治理的领域直接相关，暴露了 P2M 可落地的改进方向——该方向已逐条实施为 E1–E6（见文末落地记录）。</p>
 </div>
 
 <!-- ============ 时间线 ============ -->
-<div class="card" data-page-node-id="Qffwin4Uk7Z86BJPVVup9S">
-  <h2 style="margin-top:0" data-page-node-id="tnOcl6PGG7XyYyZEvKNJUp">事件时间线</h2>
-  <div class="timeline" data-page-node-id="fkT0AeMDB2HczOI0an9OX9">
-    <div class="tl-item" data-page-node-id="wmkUgvc3l7brYuAMEmT4OE"><div class="t" data-page-node-id="rNNr0YOGD3XiGTaHfUVtF0">09-05 16:20 · 依赖树损坏（事故）</div>
-      <div class="d" data-page-node-id="pl0dJULqRpoWyB8B8898Kn">profile 的 <code data-page-node-id="moUoj8GCAgkio0mYwHubQp">node_modules/.pnpm</code> 被清空，顶层 <code data-page-node-id="R2nkG3nZaeN1VI5A3odqHq">@deepseek-ai/</code> 变空壳；lockfile 同步丢失 <code data-page-node-id="o8OfE48rVQJkEGZUDHQvju">dsh-settings</code> 实体解析。</div></div>
-    <div class="tl-item" data-page-node-id="NvUqsfkBjm4BDCcQ7hBqf0"><div class="t" data-page-node-id="3HY4AZEbfIoRNIZ9O9C8g3">09-06 上午 · 第 1 次崩溃</div>
-      <div class="d" data-page-node-id="8PJiWYrLKQYrwaPX3Vt2Qf"><code data-page-node-id="07iGC5w82elHTvZncua1iB">pnpm install</code> 两次「成功」但崩点不变 → 揭穿 pnpm 状态文件信任快路径。</div></div>
-    <div class="tl-item" data-page-node-id="FgOVhwDk8efboXn6J0L771"><div class="t" data-page-node-id="ZAsOjRz4vQOBOVEXoZg5nV">09-06 · 第 2 次崩溃</div>
-      <div class="d" data-page-node-id="aJBdd2w0dHoKnmVCuZjLDb">强制重建 231 包后仍崩 → 真因浮出：<code data-page-node-id="HNrQCRpRA3eWciSSnT5C05">dsh-settings</code> API 版本漂移（<code data-page-node-id="zfCvKpjQ9qD386mrrOgl6W">settingsNamespace</code> 导出被新版移除）。</div></div>
-    <div class="tl-item" data-page-node-id="KyJo4QyFvgwqlT4aT6X45q"><div class="t" data-page-node-id="gDCSWWOKTvTIqpAxhO6sZC">09-06 · 第 3 次崩溃（本次核心）</div>
-      <div class="d" data-page-node-id="vwFBys8nVu2oRFEDzNohBU">钉回兼容版 <code data-page-node-id="dgSSLDB38f6bga1CBkGKZZ">dsh-settings@0.1.1-rc.2</code> 后，<code data-page-node-id="BexvFrpQD9VfJoEs94AcAo">@morlay/session-rdb</code> 终于能加载 → 与官方 JSONL 后端抢注同名服务 <code data-page-node-id="js7HtYcxlCxBCyj45EVXA5">sessionPersistence</code> → Cordis 拒绝。</div></div>
+<div class="card">
+  <h2 style="margin-top:0">事件时间线</h2>
+  <div class="timeline">
+    <div class="tl-item"><div class="t">09-05 16:20 · 依赖树损坏（事故）</div>
+      <div class="d">profile 的 <code>node_modules/.pnpm</code> 被清空，顶层 <code>@deepseek-ai/</code> 变空壳；lockfile 同步丢失 <code>dsh-settings</code> 实体解析。</div></div>
+    <div class="tl-item"><div class="t">09-06 上午 · 第 1 次崩溃</div>
+      <div class="d"><code>pnpm install</code> 两次「成功」但崩点不变 → 揭穿 pnpm 状态文件信任快路径。</div></div>
+    <div class="tl-item"><div class="t">09-06 · 第 2 次崩溃</div>
+      <div class="d">强制重建 231 包后仍崩 → 真因浮出：<code>dsh-settings</code> API 版本漂移（<code>settingsNamespace</code> 导出被新版移除）。</div></div>
+    <div class="tl-item"><div class="t">09-06 · 第 3 次崩溃（本次核心）</div>
+      <div class="d">钉回兼容版 <code>dsh-settings@0.1.1-rc.2</code> 后，<code>@morlay/session-rdb</code> 终于能加载 → 与官方 JSONL 后端抢注同名服务 <code>sessionPersistence</code> → Cordis 拒绝。</div></div>
   </div>
 </div>
 
 <!-- ============ 第一幕 ============ -->
-<div class="card" data-page-node-id="PXOGY4E5blIviksYmqACYI">
-  <h2 style="margin-top:0" data-page-node-id="rAHDx0xQcA9CM3j8SvsUoT">第一幕 · 依赖树损坏（已修复）</h2>
-  <div class="verdict" data-page-node-id="gfEhId5y1ltk7EdFV55mhL"><span class="tag t-danger" data-page-node-id="hZpiLoYBJDbB3B3tBU4dsv">崩因①</span>
-    <div data-page-node-id="OD4lNEqsWod2zUzgFDhlG1"><b data-page-node-id="JdFphucmtMuohNkHX2Uys6">node_modules 实体被抹除，只剩「装过的记忆」</b>
-      <p style="margin-top:6px" data-page-node-id="qBQLluWGAQYiyX4futZXKk">证据：<code data-page-node-id="F6nUgnqNVCwTgHuWZGSFoE">.pnpm</code> 仅剩 <code data-page-node-id="2aIaXe7wKTnKeW11Z8G6kO">lock.yaml</code>（mtime 09-05 16:20）；顶层 <code data-page-node-id="eouVOCIMhguN8JWjHZRlqY">@deepseek-ai/</code> 空壳；而 <code data-page-node-id="X2wlmKJvC02NLKLswarPLs">pnpm-lock.yaml</code>、<code data-page-node-id="UG4myG6m5bsK2pxLs4Aa8Q">package.json</code>、全局 store（758MB）均完好。</p>
-      <p data-page-node-id="akDAvLIECNXareTmcGfh5g"><b data-page-node-id="cHebs1i8gFBiZfPj26l9LS">为什么越修越糟：</b>pnpm 以 <code data-page-node-id="ywV0L14j1iv68NLfoPuCAv">.modules.yaml</code> + lockfile 判断「是否 up to date」，不 stat 磁盘实体 → 普通 <code data-page-node-id="BkxIw0iD6oqBKEGUeZx1e0">pnpm install</code> 永远走快路径跳过，实体永不补齐。</p>
-      <div class="callout ok" data-page-node-id="rNCyBGOrmD5S5OLFafflJJ"><b data-page-node-id="jB2dRlosJQxNnuu3qDRwF9">修复：</b><code data-page-node-id="n3Pp7EQpjSQe2TcQebkrYC">ren node_modules node_modules.bak-…</code>（改名备份而非删除）→ <code data-page-node-id="9ADCUVzxkkeXxzD8eJNSRs">pnpm install</code> 强制重建，231 包从 store 硬链，7.4s 完成。</div>
+<div class="card">
+  <h2 style="margin-top:0">第一幕 · 依赖树损坏（已修复）</h2>
+  <div class="verdict"><span class="tag t-danger">崩因①</span>
+    <div><b>node_modules 实体被抹除，只剩「装过的记忆」</b>
+      <p style="margin-top:6px">证据：<code>.pnpm</code> 仅剩 <code>lock.yaml</code>（mtime 09-05 16:20）；顶层 <code>@deepseek-ai/</code> 空壳；而 <code>pnpm-lock.yaml</code>、<code>package.json</code>、全局 store（758MB）均完好。</p>
+      <p><b>为什么越修越糟：</b>pnpm 以 <code>.modules.yaml</code> + lockfile 判断「是否 up to date」，不 stat 磁盘实体 → 普通 <code>pnpm install</code> 永远走快路径跳过，实体永不补齐。</p>
+      <div class="callout ok"><b>修复：</b><code>ren node_modules node_modules.bak-…</code>（改名备份而非删除）→ <code>pnpm install</code> 强制重建，231 包从 store 硬链，7.4s 完成。</div>
     </div>
   </div>
 </div>
 
 <!-- ============ 第二幕 ============ -->
-<div class="card" data-page-node-id="rKXq09feyEw0WjUupnbpgv">
-  <h2 style="margin-top:0" data-page-node-id="tOXkSrxSc3YdRPARzY9Yay">第二幕 · dsh-settings API 版本漂移（已修复）</h2>
-  <div class="verdict" data-page-node-id="zIowEb8nY53MkA0VjTxnZo"><span class="tag t-danger" data-page-node-id="f2TVrRacdVQyOxNHG1I0Fn">崩因②</span>
-    <div data-page-node-id="yztsjrQcM9IP7e6srysEea"><b data-page-node-id="euoCGrv9aQ1TyskhjM0nPB">模块「找到了」但版本不对 → 报 export 缺失而非 MODULE_NOT_FOUND</b>
-      <p style="margin-top:6px" data-page-node-id="JXlCgMe0OPQwYfN9yh495j">崩溃点：<code data-page-node-id="BtGoZVwMVHvExBqDRVAJPJ">@morlay/session-rdb@0.0.11</code> 按旧 API 写：<code data-page-node-id="fu0x1333SFiGyQKHJ8WofB">import { settingsNamespace } from "@deepseek-ai/dsh-settings"</code>。</p>
-      <ul data-page-node-id="vWhuuMUpWeTrccADdnEbvV">
-        <li data-page-node-id="lxpLb6NxvVKFjgU75JtAdR"><b data-page-node-id="6VHTqegK44kviZgnSUJqrt">它要的版本</b>：peer <code data-page-node-id="W72cNqMiouMcVtv6qD3VDu">^0.1.1-rc.2</code> —— 该版本<b data-page-node-id="Cs3YzKsNc14VzmE0D8cUGl">确有</b> <code data-page-node-id="Y6rhgWFFeuc4IqwBexms4v">settingsNamespace</code>（下载 tarball 实证）；</li>
-        <li data-page-node-id="OxbZ1WdCqmvf8OvJBLMzyP"><b data-page-node-id="PV0LjDMgrVzajui4bbO9N5">实际解析到的</b>：profile 本地实体丢失后，Node 一路爬升命中<b data-page-node-id="r1B0kRLo9byTBtH51lNGe8">全局 CLI 内置</b>的 <code data-page-node-id="AsvBlssG2IFLnEuCwLl5SM">dsh-settings@0.1.2-alpha.3</code> —— 该版本已移除该导出（改为 <code data-page-node-id="AGK59zL1AW6mQzGAOR5UEf">SettingsProvider</code> 等）；</li>
-        <li data-page-node-id="rP65NkhL0LSENCEcFjISOf"><b data-page-node-id="seadpk6YM1UjSKB9xiAhXo">诱因</b>：9-05 那次损坏把 lockfile 中 <code data-page-node-id="ZwjAw4xecqI1mOQofOnTNl">dsh-settings</code> 的 resolution 条目弄丢（只剩 peer 声明）→ 重装永不安装它。</li>
+<div class="card">
+  <h2 style="margin-top:0">第二幕 · dsh-settings API 版本漂移（已修复）</h2>
+  <div class="verdict"><span class="tag t-danger">崩因②</span>
+    <div><b>模块「找到了」但版本不对 → 报 export 缺失而非 MODULE_NOT_FOUND</b>
+      <p style="margin-top:6px">崩溃点：<code>@morlay/session-rdb@0.0.11</code> 按旧 API 写：<code>import { settingsNamespace } from "@deepseek-ai/dsh-settings"</code>。</p>
+      <ul>
+        <li><b>它要的版本</b>：peer <code>^0.1.1-rc.2</code> —— 该版本<b>确有</b> <code>settingsNamespace</code>（下载 tarball 实证）；</li>
+        <li><b>实际解析到的</b>：profile 本地实体丢失后，Node 一路爬升命中<b>全局 CLI 内置</b>的 <code>dsh-settings@0.1.2-alpha.3</code> —— 该版本已移除该导出（改为 <code>SettingsProvider</code> 等）；</li>
+        <li><b>诱因</b>：9-05 那次损坏把 lockfile 中 <code>dsh-settings</code> 的 resolution 条目弄丢（只剩 peer 声明）→ 重装永不安装它。</li>
       </ul>
-      <div class="callout ok" data-page-node-id="FSE7nhpFpRfPcntAedimLE"><b data-page-node-id="5Vk68oAIPJT6QQrtD6iLjo">修复：</b>profile 显式 <code data-page-node-id="59BDrfX8qW2x1ko9ySvDmd">pnpm add @deepseek-ai/dsh-settings@0.1.1-rc.2</code> → 本地实体 + lockfile resolution 齐备 → Node 解析改命中本地兼容版。经验：报「does not provide an export」≠ 缺包，是解析目标版本错；用 <code data-page-node-id="saPLx94CW036Ezlj5ybmPf">createRequire(...).resolve()</code> 实证解析路径。</div>
-      <div class="callout warn" data-page-node-id="NMPYCCMuZ2ChHNuCBHvYE2"><b data-page-node-id="jUujkDCZ89jjkWmaiCrIzR">上游注：</b>morlay 在 <code data-page-node-id="VFh4tcpoVNoDr7NT7sgEKV">session-rdb@0.0.13</code> 已适配新 API（peer 改 <code data-page-node-id="Dv40qx4kKiBk5jdSipO33a">^0.1.2-rc.1</code>）——pre-1.0 生态 API 破坏性变更频繁，是此坑的温床。</div>
+      <div class="callout ok"><b>修复：</b>profile 显式 <code>pnpm add @deepseek-ai/dsh-settings@0.1.1-rc.2</code> → 本地实体 + lockfile resolution 齐备 → Node 解析改命中本地兼容版。经验：报「does not provide an export」≠ 缺包，是解析目标版本错；用 <code>createRequire(...).resolve()</code> 实证解析路径。</div>
+      <div class="callout warn"><b>上游注：</b>morlay 在 <code>session-rdb@0.0.13</code> 已适配新 API（peer 改 <code>^0.1.2-rc.1</code>）——pre-1.0 生态 API 破坏性变更频繁，是此坑的温床。</div>
     </div>
   </div>
 </div>
 
 <!-- ============ 第三幕（核心） ============ -->
-<div class="card" data-page-node-id="J9m8KkFbeeMPmfFN7ofPJI">
-  <h2 style="margin-top:0" data-page-node-id="uFhrPxjAFuJto3IM1jzE1a">第三幕 · sessionPersistence 服务重名冲突（本次核心，已修复）</h2>
-  <div class="verdict" data-page-node-id="ijNVhBGLkbYVwzUeQYUHm0"><span class="tag t-danger" data-page-node-id="Yx7tkjGYJqJdOCmj1tAyD9">崩因③</span>
-    <div data-page-node-id="hY5uWa9agUTKnBC3rRs0wj"><b data-page-node-id="MnyARH7KD7WGYG7VPv02Nq">两个会话持久化后端同时注册同名 Cordis 服务</b>
-      <p style="margin-top:6px" data-page-node-id="hEz9W3lVGc0lNeiho1aJb2">报错：<code data-page-node-id="zCm9siNNvdg8v4P18a97n7">service "sessionPersistence" has been registered at &lt;JsonlSessionPersistence&gt;</code></p>
-      <table data-page-node-id="2NPAIGKnZ74s2OrYAU15kB">
-        <tr data-page-node-id="sweDbJb39w2GeYmwLki1mW"><th data-page-node-id="hcKnQWCMKfu9esLlFPrJqX">冲突方</th><th data-page-node-id="9txwmW9W4iIzW7MeGf75J8">身份</th><th data-page-node-id="WKCUR3tsUPS1DRUrzi7C5h">提供者</th><th data-page-node-id="zkVUgp1bDatNYeQPJ314ht">注册服务</th></tr>
-        <tr data-page-node-id="42UBtkE6t669MlIWT3g89r"><td data-page-node-id="IjSE3MplkmvAYSq8uVlXTS">官方 <code data-page-node-id="zx9H2H7B7MavBP7ZxlVXnr">session-persistence-jsonl</code></td><td data-page-node-id="VTRfM09383IST6UOmVBmfD">dsh-base 内置默认后端</td><td data-page-node-id="BVE1BsAgowbUz3HqGNqlwI">JsonlSessionPersistence</td><td rowspan="2" data-page-node-id="ulXkwscUH6ZPzLCDGLVikm"><code data-page-node-id="eUz3aMPF5zsmBJqp7g2HId">sessionPersistence</code>（同名 → Cordis 拒绝重复注册）</td></tr>
-        <tr data-page-node-id="8BibfeDCazJ1hZaywmtIb7"><td data-page-node-id="OYyNseUK3MV0GwpuxAaZet"><code data-page-node-id="SxNZWkWfkc1HqplsaeMZTU">web-ui-session-rdb</code></td><td data-page-node-id="zVxHfaM6iT7YD5A8o60HS3">web-all 全家桶经 @morlay/better-session 引入的 RDB/SQLite 后端</td><td data-page-node-id="7TPU9rkZVbciTXPHBxhZOF">SessionPersistenceRdb</td></tr>
+<div class="card">
+  <h2 style="margin-top:0">第三幕 · sessionPersistence 服务重名冲突（本次核心，已修复）</h2>
+  <div class="verdict"><span class="tag t-danger">崩因③</span>
+    <div><b>两个会话持久化后端同时注册同名 Cordis 服务</b>
+      <p style="margin-top:6px">报错：<code>service "sessionPersistence" has been registered at &lt;JsonlSessionPersistence&gt;</code></p>
+      <table>
+        <tr><th>冲突方</th><th>身份</th><th>提供者</th><th>注册服务</th></tr>
+        <tr><td>官方 <code>session-persistence-jsonl</code></td><td>dsh-base 内置默认后端</td><td>JsonlSessionPersistence</td><td rowspan="2"><code>sessionPersistence</code>（同名 → Cordis 拒绝重复注册）</td></tr>
+        <tr><td><code>web-ui-session-rdb</code></td><td>web-all 全家桶经 @morlay/better-session 引入的 RDB/SQLite 后端</td><td>SessionPersistenceRdb</td></tr>
       </table>
-      <p data-page-node-id="20qEtFqHv1gDBRejea0HCm"><b data-page-node-id="8Rdjg7bXljbc5YtFHIGa5N">关键证据（定位到根因的决定性一步）：</b></p>
-      <ul data-page-node-id="AgVyPYXAvkxt2RgfgbxyHd">
-        <li data-page-node-id="ejYek7MtQVeiWXgNNKFs55">web-all 聚合 patch（<code data-page-node-id="mnuPQH2W56IwVzgM7GbtpJ">cordis.patch.yml</code>，AUTO-GENERATED）末尾自带注释与默认值：<pre data-page-node-id="DWjBlS4pnue4sQpmGvW2IR"><code data-page-node-id="sBQdXGDR3CdITi7Gq7njDz"># inactive by default: the rows above ship disabled, so the stock persistence
+      <p><b>关键证据（定位到根因的决定性一步）：</b></p>
+      <ul>
+        <li>web-all 聚合 patch（<code>cordis.patch.yml</code>，AUTO-GENERATED）末尾自带注释与默认值：<pre><code># inactive by default: the rows above ship disabled, so the stock persistence
 # backend keeps serving sessions until you opt in.
 - id: web-ui-session-branch
   disabled: true
@@ -141,83 +141,83 @@
   disabled: true
 - id: web-ui-conversation-message-actions
   disabled: true</code></pre>
-        morlay RDB 后端<b data-page-node-id="Tz1DX6B4BaK5eKlGM155QU">出厂即禁用</b>——官方 JSONL 继续服务会话，要换 RDB 需显式 opt-in；</li>
-        <li data-page-node-id="PGh9lzxovbKbiPQN7Zcmvu">但 profile 层 <code data-page-node-id="wx3U9kH9ZokoDUM5cZO0sL">cordis.patch.yml</code> 为了开启全家桶 UI，把所有 <code data-page-node-id="GXqbmyNUkNCilZE2yAa3iH">web-ui-*</code> 整批设为 <code data-page-node-id="cSHiDxYKVlwf2yppuk9Tco">disabled: false</code>，把这三个休眠条目也唤醒了 → 双后端抢注同名服务。</li>
+        morlay RDB 后端<b>出厂即禁用</b>——官方 JSONL 继续服务会话，要换 RDB 需显式 opt-in；</li>
+        <li>但 profile 层 <code>cordis.patch.yml</code> 为了开启全家桶 UI，把所有 <code>web-ui-*</code> 整批设为 <code>disabled: false</code>，把这三个休眠条目也唤醒了 → 双后端抢注同名服务。</li>
       </ul>
-      <div class="callout ok" data-page-node-id="B9BAf6NLbaCH70PdsIHlMV"><b data-page-node-id="4r3Hj0FQ7JIt92ii8fX0aR">修复（已执行，备份 <code data-page-node-id="tydz3HFbdpR0BMuQJfNg0i">cordis.patch.yml.bak-20260906-113229</code>）：</b>把 <code data-page-node-id="jEVhPDP560pAyVxskmzTi7">web-ui-session-branch / web-ui-session-rdb / web-ui-conversation-message-actions</code> 三行改回 <code data-page-node-id="aIBLnJeyvA8jNt8HMCuIfP">disabled: true</code>，其余 20 项全家桶 UI 一概不动。</div>
-      <div class="callout warn" data-page-node-id="g37HhWfTTKOwoQShb55c5I"><b data-page-node-id="plhBp8NBj6YnVOGNNEJowm">若确实要用 RDB 会话存储：</b>正确姿势是「二选一」——三件套置 <code data-page-node-id="P0j5pML0lNjEjY3YDY7ooT">false</code> 并追加 <code data-page-node-id="h6iT05MhXeGb2CM5VGVprn">- id: session-persistence-jsonl / disabled: true</code> 停用官方 JSONL 后端，而非两个都开。</div>
+      <div class="callout ok"><b>修复（已执行，备份 <code>cordis.patch.yml.bak-20260906-113229</code>）：</b>把 <code>web-ui-session-branch / web-ui-session-rdb / web-ui-conversation-message-actions</code> 三行改回 <code>disabled: true</code>，其余 20 项全家桶 UI 一概不动。</div>
+      <div class="callout warn"><b>若确实要用 RDB 会话存储：</b>正确姿势是「二选一」——三件套置 <code>false</code> 并追加 <code>- id: session-persistence-jsonl / disabled: true</code> 停用官方 JSONL 后端，而非两个都开。</div>
     </div>
   </div>
 </div>
 
 <!-- ============ 三幕小结 ============ -->
-<div class="card" data-page-node-id="hCmDG2axjcNVQEPFArZhxB">
-  <h2 style="margin-top:0" data-page-node-id="KLJXq6VD9a7UIgEi36vGGi">三幕小结：为什么每次都「看似无解」</h2>
-  <table data-page-node-id="uNTHuePMSE3yTTq6vtlYrH">
-    <tr data-page-node-id="UD28n5q4rsIOCY7uhlZf0h"><th data-page-node-id="iCDhCKDJsj09rkFRmElXvo">幕</th><th data-page-node-id="9w15F2G4pDZ0arK1tocBrO">表象</th><th data-page-node-id="VdbGEgxSlxVTP3NDSnIU6Z">误导方向</th><th data-page-node-id="tHVVSRjNp3yGj0Ldn1TelY">破局手段</th></tr>
-    <tr data-page-node-id="lXZIJHWU55Y1l8L7n3IKNF"><td data-page-node-id="43WRXq2CuWBSVzNFf3YDGg">①</td><td data-page-node-id="raZax86HrgGZerB4VxR30R">缺包报错</td><td data-page-node-id="0nDYWLfBWHyEz1yGli4bTH">「再 pnpm install 一次」</td><td data-page-node-id="UibeSkey8H4d0QIiNdAQJr">读 <code data-page-node-id="LpOcl9CTlhUV5V0xlEmkgH">.modules.yaml</code>，识破状态文件信任快路径</td></tr>
-    <tr data-page-node-id="C7GlOClPirIz4HJivXGEAy"><td data-page-node-id="O81XyZwWXjMDhqm43tFSjp">②</td><td data-page-node-id="hD5BMDECNDas5Np6iX6z7z">export 缺失</td><td data-page-node-id="wRewaeHrZhCvBovwh7QwT1">「包没装全」</td><td data-page-node-id="QyLnJeSJAg3sqzSWIkzQJD"><code data-page-node-id="xCYSQaNqProN5EQokSRYEf">createRequire.resolve()</code> 实证解析目标 = 全局 CLI 旧版</td></tr>
-    <tr data-page-node-id="oO0tUEj43jysSb52I4sm7z"><td data-page-node-id="JqzRBJOk1StJTOO4L8rLi9">③</td><td data-page-node-id="9p3N1oVLMfFE8fc2Igspxz">服务重复注册</td><td data-page-node-id="qRm1A6AvF5Z1N3ACJRWXbx">「依赖又坏了」</td><td data-page-node-id="YSe6r9gFTlFpCgG0pX3S6W">读三方 patch 层，发现「出厂禁用被用户层覆盖」</td></tr>
+<div class="card">
+  <h2 style="margin-top:0">三幕小结：为什么每次都「看似无解」</h2>
+  <table>
+    <tr><th>幕</th><th>表象</th><th>误导方向</th><th>破局手段</th></tr>
+    <tr><td>①</td><td>缺包报错</td><td>「再 pnpm install 一次」</td><td>读 <code>.modules.yaml</code>，识破状态文件信任快路径</td></tr>
+    <tr><td>②</td><td>export 缺失</td><td>「包没装全」</td><td><code>createRequire.resolve()</code> 实证解析目标 = 全局 CLI 旧版</td></tr>
+    <tr><td>③</td><td>服务重复注册</td><td>「依赖又坏了」</td><td>读三方 patch 层，发现「出厂禁用被用户层覆盖」</td></tr>
   </table>
-  <div class="callout info" data-page-node-id="a1tsjMtIsomoFnAf06pT3D"><b data-page-node-id="9b2eU0hGGZZxK45s6j7vxc">共同教训：</b>DSH pre-1.0 的 loader 补丁层 + pnpm 状态文件 + API 快速漂移三者叠加，任何「凭经验重试」都会踩空；每次都要回到<b data-page-node-id="AKQ5HXIAQCAxPIiokeu4BB">文件系统与源码实证</b>。</div>
+  <div class="callout info"><b>共同教训：</b>DSH pre-1.0 的 loader 补丁层 + pnpm 状态文件 + API 快速漂移三者叠加，任何「凭经验重试」都会踩空；每次都要回到<b>文件系统与源码实证</b>。</div>
 </div>
 
 <!-- ============ P2M 改进落地 ============ -->
-<div class="card" data-page-node-id="XojKva9mWyAKHtAcEELQWt">
-  <h2 style="margin-top:0" data-page-node-id="ljw1pqSBB3ZLrBKRlB4vR2">对插件冲突管家（P2M）的改进建议 → E1–E6 已全部落地 <span style="font-size:13px;font-weight:400;color:var(--ok)" data-page-node-id="JwiouqciY15eEy2ina9bP4">（v0.1.3 ~ v0.1.6）</span></h2>
-  <p data-page-node-id="Q5EYO9ob3PcUy5RlsXjgRG">本次事件中两幕（② 版本漂移、③ 同名服务）正是 P2M 声称治理的「插件冲突」范畴，但现有检测面覆盖不到。以下改进点已逐条实施、配套单测与真实冒烟验证，并按「GitHub main + 市场留痕」双端同步，见文末实施记录表。</p>
-  <div class="improve" data-page-node-id="59exBrKgZ6kazS8brFfThz">
-    <div class="imp" data-page-node-id="SrXjqcegoXKvNpwTrVFsBW"><span class="no" data-page-node-id="HQu3MgJlexfp1yUcaxUNVk">E1</span><b data-page-node-id="lQMq2KPc7jjYhHkEkyBn4U">同名服务注册预检（新冲突类 C7）</b><span class="done" data-page-node-id="vNFIB2vZFbUDlCuXhDQAdY">已实施</span>
-      <div class="stage" data-page-node-id="L5nCwNdwLBDNqmzpoLJm9i">lib/conflicts.js · lib/policy.js · lib/index.js · 对应本次第三幕</div>
-      <p style="margin-top:6px" data-page-node-id="C8LVhmeFAfyOSVDOqvGLbe">静态扫描每个 entry 目标包入口的 Cordis 服务注册面（<code data-page-node-id="h2S9RrpvQBCjLB5mz3CbBR">super(ctx, "…")</code> / <code data-page-node-id="S364mFgaB67CRHMSwg9rXs">provide("…")</code>，连带一跳依赖包），检测「不同 entry 提供同名 service」并提前报告——本次 <code data-page-node-id="leZRQqHVKOWdu4EcjivPjU">sessionPersistence</code> 双注册在启动前即可被识别；命中官方 known-core 服务（<code data-page-node-id="FRt1F1qh1JOkhAbiEOZSBW">sessionPersistence</code>）时给出「二选一」修复建议。7 个单测全绿；真实冒烟：对 <code data-page-node-id="YMsA8n0xuHbr8aRV1LFriO">web-ui-session-rdb</code> 扫出注册 <code data-page-node-id="djxNEHxEh5z242pGc5LoOl">sessionPersistence</code> 撞 core 默认后端。</p></div>
-    <div class="imp" data-page-node-id="8J0xkjU4FLk0XRQKnvqlgh"><span class="no" data-page-node-id="RmtsGQIDs21iVlGulerTXk">E2</span><b data-page-node-id="hCkGSfwbU2QNIX7C27bCKr">依赖解析路径留痕（resolve 快照）</b><span class="done" data-page-node-id="tHvnYRorcU52JO8C2GSMnH">已实施</span>
-      <div class="stage" data-page-node-id="twCoppz8crHuXma2cycIDx">lib/state.js · lib/index.js · 对应本次第二幕</div>
-      <p style="margin-top:6px" data-page-node-id="ysItpUiFNHhBShd5O6BXsK">boot 与每次对账记录各 entry 的 <code data-page-node-id="JG5i2gCztpIzDoygiy26M7">require.resolve</code> 实际解析路径与版本（含是否命中 profile 本地）；一旦出现「本地缺失 → 爬升到全局 CLI」这类解析漂移，写 <code data-page-node-id="hbEZeDFveTs0TdEBy5JQjh">resolve-drift</code> incident 并给出钉版本建议，快照持久化到 <code data-page-node-id="StRF4QahWJIzfKkxEvmM2Y">state.json#lastResolve</code>。5 个单测全绿；真实 profile 4 个 spec 全部 local=true 且版本正确。</p></div>
-    <div class="imp" data-page-node-id="mjNQ5b1Tw2QWqwLq3uZIPw"><span class="no" data-page-node-id="7CygoD8qTXniH5HIC4HD5Y">E3</span><b data-page-node-id="Ju1icCDzNSOx49Tb8pvoMS">peer 版本合规预检（启动前体检 preflight）</b><span class="done" data-page-node-id="AK0kucCoGy2ff5lp3TGH1S">已实施</span>
-      <div class="stage" data-page-node-id="92DXHY6t9EOHwbvLtlKsGf">新增 lib/preflight.js · launcher/dsh-safe.mjs · 对应本次第二幕</div>
-      <p style="margin-top:6px" data-page-node-id="aNvBM8X9P2wD7nZH3YddYd">启动器拉起 DSH 前调用静态体检：核对每个 entry 声明的 peerDependencies 区间与实际解析版本（内置零依赖 semver 子集，prerelease 按同 [major.minor.patch] 元组规则判定），版本越界即报告/给出钉版本命令，<code data-page-node-id="Pyniu2GbZt8VM51whsZSSv">DSH_P2M_PREFLIGHT=block</code> 可拒启；同时暴露 <code data-page-node-id="tCa1GhIFlP2RLl9V4ytBPo">ctx.p2m.preflight()</code>。7 个单测全绿；真实 profile 首跑即抓出 2 条现存漂移（dsh-settings 的 peer brand/invariants 爬到全局 0.1.2-alpha.3）。</p></div>
-    <div class="imp" data-page-node-id="NL5eBd7wPdP7JaPs5A1uD5"><span class="no" data-page-node-id="NiJvscZ3OYWqAj5hPAEXAZ">E4</span><b data-page-node-id="81adklCcqIjjf1L9jZxEHV">profile 层覆盖感知</b><span class="done" data-page-node-id="qLPWFE0jLSGlQbmTgmxeTA">已实施</span>
-      <div class="stage" data-page-node-id="PcuuhVCGhAonxF1aPrDmcD">lib/conflicts.js · lib/index.js · 对应本次第三幕</div>
-      <p style="margin-top:6px" data-page-node-id="fpNCmGFHsbiheP83GHBXNY">boot 自动发现 profile 与各 bundle 的 <code data-page-node-id="J7Ut0QC7vMDS2ON3vzM21r">cordis.patch.yml</code> 分层扫描：检测到「出厂 <code data-page-node-id="VBjKDcVGyxR2GHOD8CyDYa">disabled:true</code> 被用户层 <code data-page-node-id="DvjF9M1choBujZWrA7CPJt">disabled:false</code> 覆盖」时直接输出「二选一」建议（本次就是「全开清单覆盖了出厂禁用」）；双 overlay 分歧同样告警；C4 收紧为「同形态重复」，insert+overlay 合法习语（web-all）不再误报。5 个单测全绿；真实扫描 26 → 23 命中且无 error。</p></div>
-    <div class="imp" data-page-node-id="54x9GBmA55v3ksNLTLJVcH"><span class="no" data-page-node-id="uxGP1VLdlp8NPoUdf93n81">E5</span><b data-page-node-id="hMQ68VrDCXfGn4BmHtM3C6">冲突速查表与文档同步扩展</b><span class="done" data-page-node-id="nhqqSikfYKLtHAiXaHxPla">已实施</span>
-      <div class="stage" data-page-node-id="3FoG66Y0R2u1LAAPh83ibm">DESIGN.md · README.md / README.en.md · AGENTS.md</div>
-      <p style="margin-top:6px" data-page-node-id="b8UbFkUzbbIPHkT2IVcIYE">C7 类入冲突矩阵（§6.1）与 README 冲突速查表（补「同名服务 / 版本漂移」两行）；配置表补 <code data-page-node-id="YuZvEHAAMQiqTEtWHvMT2H">knownCoreServices / c7ScanIntervalMs / preflightOnBoot / scanBootLayers</code>；API 表补 <code data-page-node-id="Sn0lKMO9ykwQDpQzf3Eksx">preflight()</code>；AGENTS.md 沉淀本次「pnpm 状态文件信任」「export 缺失 ≠ 缺包」「service registered = 出厂禁用被覆盖」「cordis 注册字面量两类」四条排障心法。全仓单测 74 个全绿。</p></div>
-    <div class="imp" data-page-node-id="4CXgQe7sO27A6WGRFeBA3c"><span class="no" data-page-node-id="vfrfbRGtZiNj63eanMTa4w">E6</span><b data-page-node-id="hwxrJkEBg0t8yUQjlRfVGl">（非代码）上游反馈</b><span class="done" data-page-node-id="0QKsbH4pi1f0ZhYFZREVAj">已反馈</span>
-      <div class="stage" data-page-node-id="tZGOBwGqtgO4ccRMrmY8Km">dsh 生态协作</div>
-      <p style="margin-top:6px" data-page-node-id="CbcF4qvqMfgmdIEHTOSqGX">web-all 聚合脚本把 better-session 的 insert 行与「出厂禁用」行拆开生成、导致 opt-in 语义割裂；<code data-page-node-id="DnVoTzKWRR18K91bHNbKJz">dsh-settings</code> 破坏性改名无迁移提示。已以 issue / discussion 形式反馈：<a href="https://github.com/zhu1090093659/dsh-web/issues/1394" data-page-node-id="BYqikCQRPXZz1wOCnWz8bx">zhu1090093659/dsh-web#1394</a>（经本机 package.json 元数据锁定上游实为 zhu1090093659/dsh-web，非 @linxin666 个人仓库）、<a href="https://github.com/deepseek-ai/deepseek-harness/discussions/5771" data-page-node-id="rmcpiEGoqLKyZy1pE7A6BH">deepseek-ai/deepseek-harness Discussion #5771</a>（该仓库关闭 Issues，改走 Discussion）。</p></div>
+<div class="card">
+  <h2 style="margin-top:0">对插件冲突管家（P2M）的改进建议 → E1–E6 已全部落地 <span style="font-size:13px;font-weight:400;color:var(--ok)">（v0.1.3 ~ v0.1.6）</span></h2>
+  <p>本次事件中两幕（② 版本漂移、③ 同名服务）正是 P2M 声称治理的「插件冲突」范畴，但现有检测面覆盖不到。以下改进点已逐条实施、配套单测与真实冒烟验证，并按「GitHub main + 市场留痕」双端同步，见文末实施记录表。</p>
+  <div class="improve">
+    <div class="imp"><span class="no">E1</span><b>同名服务注册预检（新冲突类 C7）</b><span class="done">已实施</span>
+      <div class="stage">lib/conflicts.js · lib/policy.js · lib/index.js · 对应本次第三幕</div>
+      <p style="margin-top:6px">静态扫描每个 entry 目标包入口的 Cordis 服务注册面（<code>super(ctx, "…")</code> / <code>provide("…")</code>，连带一跳依赖包），检测「不同 entry 提供同名 service」并提前报告——本次 <code>sessionPersistence</code> 双注册在启动前即可被识别；命中官方 known-core 服务（<code>sessionPersistence</code>）时给出「二选一」修复建议。7 个单测全绿；真实冒烟：对 <code>web-ui-session-rdb</code> 扫出注册 <code>sessionPersistence</code> 撞 core 默认后端。</p></div>
+    <div class="imp"><span class="no">E2</span><b>依赖解析路径留痕（resolve 快照）</b><span class="done">已实施</span>
+      <div class="stage">lib/state.js · lib/index.js · 对应本次第二幕</div>
+      <p style="margin-top:6px">boot 与每次对账记录各 entry 的 <code>require.resolve</code> 实际解析路径与版本（含是否命中 profile 本地）；一旦出现「本地缺失 → 爬升到全局 CLI」这类解析漂移，写 <code>resolve-drift</code> incident 并给出钉版本建议，快照持久化到 <code>state.json#lastResolve</code>。5 个单测全绿；真实 profile 4 个 spec 全部 local=true 且版本正确。</p></div>
+    <div class="imp"><span class="no">E3</span><b>peer 版本合规预检（启动前体检 preflight）</b><span class="done">已实施</span>
+      <div class="stage">新增 lib/preflight.js · launcher/dsh-safe.mjs · 对应本次第二幕</div>
+      <p style="margin-top:6px">启动器拉起 DSH 前调用静态体检：核对每个 entry 声明的 peerDependencies 区间与实际解析版本（内置零依赖 semver 子集，prerelease 按同 [major.minor.patch] 元组规则判定），版本越界即报告/给出钉版本命令，<code>DSH_P2M_PREFLIGHT=block</code> 可拒启；同时暴露 <code>ctx.p2m.preflight()</code>。7 个单测全绿；真实 profile 首跑即抓出 2 条现存漂移（dsh-settings 的 peer brand/invariants 爬到全局 0.1.2-alpha.3）。</p></div>
+    <div class="imp"><span class="no">E4</span><b>profile 层覆盖感知</b><span class="done">已实施</span>
+      <div class="stage">lib/conflicts.js · lib/index.js · 对应本次第三幕</div>
+      <p style="margin-top:6px">boot 自动发现 profile 与各 bundle 的 <code>cordis.patch.yml</code> 分层扫描：检测到「出厂 <code>disabled:true</code> 被用户层 <code>disabled:false</code> 覆盖」时直接输出「二选一」建议（本次就是「全开清单覆盖了出厂禁用」）；双 overlay 分歧同样告警；C4 收紧为「同形态重复」，insert+overlay 合法习语（web-all）不再误报。5 个单测全绿；真实扫描 26 → 23 命中且无 error。</p></div>
+    <div class="imp"><span class="no">E5</span><b>冲突速查表与文档同步扩展</b><span class="done">已实施</span>
+      <div class="stage">DESIGN.md · README.md / README.en.md · AGENTS.md</div>
+      <p style="margin-top:6px">C7 类入冲突矩阵（§6.1）与 README 冲突速查表（补「同名服务 / 版本漂移」两行）；配置表补 <code>knownCoreServices / c7ScanIntervalMs / preflightOnBoot / scanBootLayers</code>；API 表补 <code>preflight()</code>；AGENTS.md 沉淀本次「pnpm 状态文件信任」「export 缺失 ≠ 缺包」「service registered = 出厂禁用被覆盖」「cordis 注册字面量两类」四条排障心法。全仓单测 74 个全绿。</p></div>
+    <div class="imp"><span class="no">E6</span><b>（非代码）上游反馈</b><span class="done">已反馈</span>
+      <div class="stage">dsh 生态协作</div>
+      <p style="margin-top:6px">web-all 聚合脚本把 better-session 的 insert 行与「出厂禁用」行拆开生成、导致 opt-in 语义割裂；<code>dsh-settings</code> 破坏性改名无迁移提示。已以 issue / discussion 形式反馈：<a href="https://github.com/zhu1090093659/dsh-web/issues/1394">zhu1090093659/dsh-web#1394</a>（经本机 package.json 元数据锁定上游实为 zhu1090093659/dsh-web，非 @linxin666 个人仓库）、<a href="https://github.com/deepseek-ai/deepseek-harness/discussions/5771">deepseek-ai/deepseek-harness Discussion #5771</a>（该仓库关闭 Issues，改走 Discussion）。</p></div>
   </div>
 </div>
 
 <!-- ============ 实施与同步记录 ============ -->
-<div class="card" data-page-node-id="JcmfycJ6VLB0GDb0x72uSW">
-  <h2 style="margin-top:0" data-page-node-id="bfzRQFt4Ph6BktYPocYcNw">E1–E6 实施与同步记录</h2>
-  <table data-page-node-id="Boh2IZGcYPGPJRH6XKViiU">
-    <tr data-page-node-id="vtGEOmVJ6ua1N4fAHMhAnw"><th data-page-node-id="ADNFuRHWy2ftE086JNAsAM">条目</th><th data-page-node-id="Mb8POfGELn5HskX78yNVA2">版本 / 提交</th><th data-page-node-id="4R1eHc8J7HAyAtR08audfA">核心改动文件</th><th data-page-node-id="FeDMf6dU9YXOo2L2IKeiiu">验证</th><th data-page-node-id="NN7UmW8ksniRaBKGqrCqD4">同步方式</th></tr>
-    <tr data-page-node-id="XQf6wUEhYvzacT6bFTjpB5"><td data-page-node-id="QlAPPZyinJTkZ5JpbQc2kN">E1 · C7 同名服务预检</td><td data-page-node-id="4OTHaNdBCLgN46tpIh5DIs">v0.1.3 · <code data-page-node-id="COfLICAofOjorWSCO24mBd">9aa2273</code></td><td data-page-node-id="pjSeHScI6qB0a38ABjlyA5">conflicts.js / policy.js / index.js + test/c7-service-clash.test.mjs（7 例）</td><td data-page-node-id="LLlUvEFmhoASBeSBI32rpD">真实扫出 web-ui-session-rdb 注册 sessionPersistence 撞 core</td><td rowspan="5" data-page-node-id="1gEBfdSplskLy2LVbOYgL8">GitHub：push main；市场：2BingLing/dsh-market#127 评论留痕（catalog 每日 06:00 自动刷新）</td></tr>
-    <tr data-page-node-id="nrklVOUhTFjQwhVsnsC49G"><td data-page-node-id="vpkIpyeKMXyKIui07aAT6S">E2 · resolve 快照</td><td data-page-node-id="PazAmMenPTLqS76fJoSVuu">v0.1.4 · <code data-page-node-id="s36i1uOae1sajFccKfjIUW">dd90b28</code></td><td data-page-node-id="iOsOgGxMb2wjEZRnDIesvz">state.js / index.js + test/e2-resolve-snapshot.test.mjs（5 例）</td><td data-page-node-id="18YJ1ppiMQ1e9o1nk7ldIN">真实 profile 4 spec 全 local</td></tr>
-    <tr data-page-node-id="d0hbh4WzD5SL33xZFkSdTu"><td data-page-node-id="aTkwh9FKO0GjMY3hl1HJWb">E3 · preflight 体检</td><td data-page-node-id="9aPDTTMsR7txYT9adsyAhR">v0.1.5 · <code data-page-node-id="1jNMoWJ9FjsauPIZyFU9B7">8faf4bf</code></td><td data-page-node-id="HTM3bBiQI03inncexggGsn">新增 preflight.js / index.js / launcher/dsh-safe.mjs + test/e3-preflight.test.mjs（7 例）</td><td data-page-node-id="aqrjdrCS8X8gDBAdEP9rza">真实首跑抓出 2 条现存漂移</td></tr>
-    <tr data-page-node-id="VEdvaSCUMA6f4Z9SkvDqkg"><td data-page-node-id="bu5tlzLBZi1gMM65xdH70z">E4 · profile 覆盖感知</td><td data-page-node-id="YrapSBiDSMzfpKei85ywaG">v0.1.6 · <code data-page-node-id="5pKTAaOm7Jm8iS5F0g7hvY">e9420c3</code></td><td data-page-node-id="uAtdCN10i2h7sUVfy4PGtB">conflicts.js / index.js + test/e4-profile-override.test.mjs（5 例）</td><td data-page-node-id="7a2YeQCfhSVbfvSE5Oh94Y">真实 patch 层 26 → 23 命中、无 error</td></tr>
-    <tr data-page-node-id="7arekD8ef5j3UxlNcNZkSG"><td data-page-node-id="Png051V37zX3X6AaqiLtNS">E5 · 文档同步</td><td data-page-node-id="Rj2STGmTeIvPrgADnSRUKQ"><code data-page-node-id="ZCcZnn4ZlycGuJgXef6bI4">309d3f0</code></td><td data-page-node-id="tSTJKz7UMYjrSYBSEJJATT">DESIGN.md / README.md / README.en.md / AGENTS.md</td><td data-page-node-id="kohnjeWwXIIUPPw6AxXYr4">全仓 74 单测全绿</td></tr>
-    <tr data-page-node-id="Hg6IITZMyNG9vaabeCCr6O"><td data-page-node-id="QgQFG6B7U4nFXWGJK5odLi">E6 · 上游反馈</td><td data-page-node-id="RkWcH6klTnka5zcA7p449W">本页终稿</td><td data-page-node-id="dSR1zBlYeL7OOkzklRbItZ">docs/incident-2026-09-06.html</td><td data-page-node-id="LOdNj7sw7CClEyPlWurUvp">issue / discussion 均已建</td><td data-page-node-id="DoGTSYmiYas4hd0UaoVROF">dsh-web#1394 + deepseek-harness Discussion #5771</td></tr>
+<div class="card">
+  <h2 style="margin-top:0">E1–E6 实施与同步记录</h2>
+  <table>
+    <tr><th>条目</th><th>版本 / 提交</th><th>核心改动文件</th><th>验证</th><th>同步方式</th></tr>
+    <tr><td>E1 · C7 同名服务预检</td><td>v0.1.3 · <code>9aa2273</code></td><td>conflicts.js / policy.js / index.js + test/c7-service-clash.test.mjs（7 例）</td><td>真实扫出 web-ui-session-rdb 注册 sessionPersistence 撞 core</td><td rowspan="5">GitHub：push main；市场：2BingLing/dsh-market#127 评论留痕（catalog 每日 06:00 自动刷新）</td></tr>
+    <tr><td>E2 · resolve 快照</td><td>v0.1.4 · <code>dd90b28</code></td><td>state.js / index.js + test/e2-resolve-snapshot.test.mjs（5 例）</td><td>真实 profile 4 spec 全 local</td></tr>
+    <tr><td>E3 · preflight 体检</td><td>v0.1.5 · <code>8faf4bf</code></td><td>新增 preflight.js / index.js / launcher/dsh-safe.mjs + test/e3-preflight.test.mjs（7 例）</td><td>真实首跑抓出 2 条现存漂移</td></tr>
+    <tr><td>E4 · profile 覆盖感知</td><td>v0.1.6 · <code>e9420c3</code></td><td>conflicts.js / index.js + test/e4-profile-override.test.mjs（5 例）</td><td>真实 patch 层 26 → 23 命中、无 error</td></tr>
+    <tr><td>E5 · 文档同步</td><td><code>309d3f0</code></td><td>DESIGN.md / README.md / README.en.md / AGENTS.md</td><td>全仓 74 单测全绿</td></tr>
+    <tr><td>E6 · 上游反馈</td><td>本页终稿</td><td>docs/incident-2026-09-06.html</td><td>issue / discussion 均已建</td><td>dsh-web#1394 + deepseek-harness Discussion #5771</td></tr>
   </table>
-  <div class="callout ok" data-page-node-id="TKsFSLnHXmYw1wMHtoLqa0"><b data-page-node-id="bbq7b0rEJ8Z9qfWrFDmXCK">同步说明：</b>插件市场（dsh-market）收录本插件后由每日 06:00 自动管道从仓库 HEAD 重扫刷新 catalog（收录 issue #127 已 closed，bot 明言「仓库本身无需改动」），因此市场同步 = 推送 GitHub main + 在 #127 评论留痕，两处保持一致。</div>
+  <div class="callout ok"><b>同步说明：</b>插件市场（dsh-market）收录本插件后由每日 06:00 自动管道从仓库 HEAD 重扫刷新 catalog（收录 issue #127 已 closed，bot 明言「仓库本身无需改动」），因此市场同步 = 推送 GitHub main + 在 #127 评论留痕，两处保持一致。</div>
 </div>
 
 <!-- ============ 附录 ============ -->
-<div class="card" data-page-node-id="DAlPlhEpVrOKaQOTSfEL5z">
-  <h2 style="margin-top:0" data-page-node-id="O7aERDpd56FthB6Gz4iKsW">附录 · 关键文件与备份</h2>
-  <table data-page-node-id="4UT1HA92einey9p5mTbS1T">
-    <tr data-page-node-id="8QlhDrbjFWy12Ln4GX8XZz"><th data-page-node-id="I6qG9XhUHP5aFzmuwKz2hV">对象</th><th data-page-node-id="RighVKCyaQT7IVHxeahalj">路径</th><th data-page-node-id="UVQJr1V1k6NcZgUF1TItjb">状态</th></tr>
-    <tr data-page-node-id="Sl1APee1XB16MAxIHffFoh"><td data-page-node-id="XJKHhPhwM0hYvnUe0Nu4wH">修复后的 profile 补丁</td><td data-page-node-id="iCjkobaHV1R98icSQGLZrN"><code data-page-node-id="n92ng2A7aBz4Fryfl9xqyT">~/.dsh/profiles/web/cordis.patch.yml</code></td><td data-page-node-id="4SiBlRJLFH1H3zZCRFU7Tl">三件套已置 disabled:true</td></tr>
-    <tr data-page-node-id="FF4TpkQk1kdkpnLM3VMBQL"><td data-page-node-id="JETsqMToOtapU0YfR25gbH">改动前备份</td><td data-page-node-id="T2J2CoEcXyqPfBY0DmgAzM"><code data-page-node-id="mZ8o0N0BI55TRzbJkfiPet">~/.dsh/profiles/web/cordis.patch.yml.bak-20260906-113229</code></td><td data-page-node-id="Bn72YbU35cwDm76SNZsxHd">可回滚</td></tr>
-    <tr data-page-node-id="qbnC2s7OgBpBovZ1fXH6dk"><td data-page-node-id="ceEwjPpeO39lsjQrslLF0A">依赖损坏备份</td><td data-page-node-id="3NWeszlGKwTANKSqGGXDFS"><code data-page-node-id="wFR56lEtspIJYEnaTEP9At">~/.dsh/profiles/web/node_modules.bak-20260906-1108/</code></td><td data-page-node-id="626huOLVvwwsX8rh6S2PPW">重建后可删（删除需确认）</td></tr>
-    <tr data-page-node-id="OgPeDMPREnjY8Nw6OiDBHR"><td data-page-node-id="CfB5hHmY312fsxtbtF60KD">钉回的兼容版本</td><td data-page-node-id="24R4Qn6pDIkTOJbkzPjQ2V"><code data-page-node-id="OcLF0wuAuSecz9z7oJ6zxO">dsh-settings@0.1.1-rc.2</code>（已入 profile deps + lockfile）</td><td data-page-node-id="UMhmmpNGUuqYvLbYYXY4Kv">勿用 <code data-page-node-id="8Y3kuCbcD9fROpbnUykwSQ">pnpm install</code> 冲掉</td></tr>
-    <tr data-page-node-id="Y04zM4NIoAsfCqsSieOIjS"><td data-page-node-id="uKklLVS0yFktCRnvTh3iqu">P2M 状态目录</td><td data-page-node-id="JpFIisOB9wJ8gNp2qRHzv3"><code data-page-node-id="PIzmt8nZCnuPHKEgfDTaqA">~/.dsh/p2m/</code>（guard / usage / incidents / state）</td><td data-page-node-id="MxFEa9ei0e7UGUFYQYVk6l">正常运行</td></tr>
+<div class="card">
+  <h2 style="margin-top:0">附录 · 关键文件与备份</h2>
+  <table>
+    <tr><th>对象</th><th>路径</th><th>状态</th></tr>
+    <tr><td>修复后的 profile 补丁</td><td><code>~/.dsh/profiles/web/cordis.patch.yml</code></td><td>三件套已置 disabled:true</td></tr>
+    <tr><td>改动前备份</td><td><code>~/.dsh/profiles/web/cordis.patch.yml.bak-20260906-113229</code></td><td>可回滚</td></tr>
+    <tr><td>依赖损坏备份</td><td><code>~/.dsh/profiles/web/node_modules.bak-20260906-1108/</code></td><td>重建后可删（删除需确认）</td></tr>
+    <tr><td>钉回的兼容版本</td><td><code>dsh-settings@0.1.1-rc.2</code>（已入 profile deps + lockfile）</td><td>勿用 <code>pnpm install</code> 冲掉</td></tr>
+    <tr><td>P2M 状态目录</td><td><code>~/.dsh/p2m/</code>（guard / usage / incidents / state）</td><td>正常运行</td></tr>
   </table>
-  <p style="font-size:13px;color:var(--sub)" data-page-node-id="1k4l2B2mQ4XHcdI4v2B6KY">复盘依据：本机文件系统实证 + registry tarball 导出面对比 + 三方 cordis.patch.yml 原文；所有结论均有命令级证据，非推测。</p>
+  <p style="font-size:13px;color:var(--sub)">复盘依据：本机文件系统实证 + registry tarball 导出面对比 + 三方 cordis.patch.yml 原文；所有结论均有命令级证据，非推测。</p>
 </div>
 
-<footer data-page-node-id="2er3oaXQE9oFRtvQqsvWQp">插件冲突管家（P2M）· 事件复盘文档 · 2026-09-06 生成 · E1–E6 落地终稿</footer>
+<footer>插件冲突管家（P2M）· 事件复盘文档 · 2026-09-06 生成 · E1–E6 落地终稿</footer>
 </div>
 </body>
 </html>
