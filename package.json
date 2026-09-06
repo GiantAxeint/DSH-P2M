@@ -1,6 +1,6 @@
 {
   "name": "dsh-p2m",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "插件冲突管家（P2M）：统一管理+冲突处理+按用时排序",
   "keywords": [
     "dsh",
