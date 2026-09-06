@@ -2,7 +2,7 @@
 
 **English** | [**中文**](./README.md)
 
-**Plugin Conflict Manager (P2M) for [DeepSeek Harness (DSH)](https://www.npmjs.com/package/@deepseek-ai/dsh) (Cordis runtime): unified plugin enable/disable control, conflict detection & resolution, and dynamic maintenance priority ranked by cumulative usage time.**
+**DSH Plugin Conflict Manager (P2M): pre-empts crash-causing conflicts — duplicate service registration, peer version drift, patch override clashes — isolates the offending plugin and ranks plugins by cumulative usage time, alongside unified enable/disable control and dynamic maintenance priority.**
 
 > The repo/package identifiers stay `DSH-P2M` / `dsh-p2m` (technical identifiers unchanged); P2M is the public nickname.
 

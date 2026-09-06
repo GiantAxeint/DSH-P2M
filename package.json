@@ -1,7 +1,7 @@
 {
   "name": "dsh-p2m",
   "version": "0.1.6",
-  "description": "插件冲突管家（P2M）：统一管理+冲突处理+按用时排序",
+  "description": "DSH 冲突管家（P2M）：自动拦截会让 DSH 闪退的同名服务注册/版本漂移等冲突，按用时排序、隔离肇事插件。Plugin Conflict Manager for DeepSeek Harness (DSH/Cordis).",
   "keywords": [
     "dsh",
     "dsh-plugin",
