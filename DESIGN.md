@@ -318,3 +318,25 @@ crash / timeout ───► ② 风险弹窗（lib/dialog.js，两个选项）
 **E1–E4 附带的行为修正**：incident 去重（同类静态冲突只记一次，防 30s 对账刷屏）；C4 收紧为"同形态重复"，insert+overlay 合法习语不再误报；`resolve-drift`/`preflight-failed`/`static-conflict` 三种新 incident kind 进入 `incidents.jsonl` 字典。
 
 **设计说明**：E3 的 semver 判定遵循 npm prerelease 同元组规则（候选带 prerelease 时，仅当区间含同 `[major.minor.patch]` 元组的 prerelease 比较器才可能命中——这正是 `0.1.2-alpha.3 ∉ ^0.1.1-rc.2` 的依据）。launcher 内嵌一份最小实现以维持单文件分发，改动需与 `lib/preflight.js` 同步。
+
+---
+
+## 15. 日志显示规则（v0.1.7 落地，2026-09-08）
+
+> 需求：区分"提示类"与"中断类"日志，醒目分级 + 每条附检查指引。规则全量见 README「日志显示规则」，此处记录设计决策与实现点。
+
+**分级**（所有输出统一 `[p2m]` 前缀；前缀置于最前）：
+
+| 级别 | 前缀 | 配色 | 语义 | 现状输出点（lib/index.js） |
+| --- | --- | --- | --- | --- |
+| info | — | 无色 | 正常动作 | boot #N、隔离、启用、对账决策、disposed |
+| 提示类 | `[WARNING]` | 黄 `\x1b[33m` | 未中断启动但需关注 | resolve drift、preflight 越界、self-heal、静态扫描冲突、loader 不可用 |
+| 中断/异常类 | `[ERROR]` | 红 `\x1b[31m` | 已中断或内部异常 | protected 被自动禁用（热恢复前）、internal error（reportInternal） |
+
+**hint 规则**：每条 warning/error 主行后附带**一行缩进、全英文的 `hint:`**，指明应检查的具体文件/路径或冲突细节（incidents.jsonl、profile package.json、guard 文件、patch 层等）。从属细节行（declared/resolved 对比、fix 命令）走 `detail()` 缩进输出，不重复前缀（防刷屏）。
+
+**配色自适应**：`logColor: 'auto'`（默认）仅当 stderr 为 TTY 且未设 `NO_COLOR` 时输出 ANSI，重定向/管道/日志文件零转义残留；`'always'`/`'never'` 强制。launcher（dsh-safe.mjs）遵循同一规则（顶部 ANSI_OK 判定）。
+
+**实现点**：`warn()`/`error()`/`detail()` 三个输出 helper + `reportInternal()`（内部异常 → ERROR 红 + 上报指引，区别于外部插件冲突的 WARNING 提示）。preflight 主文案同步改为人话版「建议先按下方 fix 命令钉版本，再重启 DSH」（原「建议先钉版本再重启 DSH」缺宾语）。
+
+**验证**：78 单测全绿（日志层零测试断言，纯输出格式化）；冒烟验证 `[WARNING]` 前缀 + 缩进 hint 排版；ANSI 仅在 TTY 生效，冒烟管道输出无色无转义。

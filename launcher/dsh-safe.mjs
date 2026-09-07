@@ -40,6 +40,12 @@ const GUARD_FILE = process.env.DSH_P2M_GUARD_FILE || path.join(STATE_ROOT, 'plug
 const INCIDENT_FILE = path.join(STATE_ROOT, 'incidents.jsonl')
 const LEGACY_GUARD = path.join(__dirname, 'plugin-guard.yml') // v1 file next to launcher
 const PROFILE_DIR = path.join(DSH_HOME, 'profiles', process.env.DSH_PROFILE || 'web')
+// 日志分级与显示（与 p2m 一致，见 README「日志显示规则」）：[WARNING] 黄 / [ERROR] 红
+// NO_COLOR 或非 TTY 时自动退化为无色文本，避免日志文件/管道残留 ANSI 转义码。
+const ANSI_OK = process.env.NO_COLOR === undefined && Boolean(process.stderr && process.stderr.isTTY)
+const Y = ANSI_OK ? '\x1b[33m' : ''
+const R = ANSI_OK ? '\x1b[31m' : ''
+const Z = ANSI_OK ? '\x1b[0m' : ''
 
 const BOOT_WAIT_MS = 12000 // 判定 "boot OK" vs "crashed" 的窗口
 const MAX_ATTEMPTS = 5
@@ -309,8 +315,11 @@ async function main() {
   console.log(`[dsh-safe] preflight: checked ${pre.summary.checked} peers | ok ${pre.summary.ok} | errors ${pre.summary.error}`)
   const preErrors = pre.findings.filter((f) => f.level === 'error')
   for (const f of preErrors) {
-    console.warn(`[dsh-safe] preflight ✗ ${f.bundle} peer ${f.peer}: declared ${f.declared}, resolved ${f.resolved ?? '(none)'}`)
+    console.warn(`${Y}[WARNING]${Z} [dsh-safe] preflight ✗ ${f.bundle} peer ${f.peer}: declared ${f.declared}, resolved ${f.resolved ?? '(none)'}`)
     console.warn(`    fix: ${f.fix}`)
+  }
+  if (preErrors.length) {
+    console.warn(`${Y}[WARNING]${Z} [dsh-safe] hint: Check the peer ranges declared in ${path.join(PROFILE_DIR, 'package.json')} against the resolved versions above; run the fix command (pnpm --dir "${PROFILE_DIR}" add ...), then restart DSH.`)
   }
   if (process.env.DSH_P2M_PREFLIGHT === 'block' && preErrors.length) {
     appendIncident({
@@ -318,7 +327,8 @@ async function main() {
       entryId: preErrors.map((f) => f.bundle).join(','),
       detail: preErrors.slice(0, 8).map((f) => `${f.bundle} peer ${f.peer}: declared ${f.declared} vs ${f.resolved ?? '(none)'}`).join('; '),
     })
-    console.error('[dsh-safe] DSH_P2M_PREFLIGHT=block: refusing to start until peer violations are pinned.')
+    console.error(`${R}[ERROR]${Z} [dsh-safe] DSH_P2M_PREFLIGHT=block: refusing to start until peer violations are pinned.`)
+    console.error(`${R}[ERROR]${Z} [dsh-safe] hint: See ${INCIDENT_FILE} (kind=preflight-block) and the fix commands above; resolve every violation, then restart.`)
     process.exit(1)
   }
 
@@ -331,21 +341,24 @@ async function main() {
     if (result.ok || result.err === '') continue
     const bad = extractEntryId(result.err)
     if (!bad) {
-      console.log('[dsh-safe] boot failed but could not identify the plugin. Error output:')
-      console.log(result.err.slice(0, 2000))
+      console.warn(`${Y}[WARNING]${Z} [dsh-safe] boot failed but could not identify the plugin. Error output:`)
+      console.warn(result.err.slice(0, 2000))
+      console.warn(`${Y}[WARNING]${Z} [dsh-safe] hint: Inspect the error above and ${INCIDENT_FILE}; if it names a plugin, isolate it via p2m or add it to ${GUARD_FILE}.`)
       break
     }
     if (PROTECTED.has(bad)) {
       // 铁律：永不隔离受保护条目（p2m 自身/用户指定核心）。宁可大声失败。
-      console.error(`[dsh-safe] boot crash attributed to PROTECTED entry "${bad}" — refusing to isolate.`)
+      console.error(`${R}[ERROR]${Z} [dsh-safe] boot crash attributed to PROTECTED entry "${bad}" — refusing to isolate.`)
       console.error('[dsh-safe] error output:')
       console.error(result.err.slice(0, 2000))
+      console.error(`${R}[ERROR]${Z} [dsh-safe] hint: A protected entry (DSH core / p2m) crashed DSH. Fix its dependencies inside ${PROFILE_DIR} (see the error above), then restart; it must never be added to ${GUARD_FILE}.`)
       appendIncident({ kind: 'boot-crash-protected', entryId: bad, attempt, protected: true })
       break
     }
     if (readGuardIds(GUARD_FILE).includes(bad)) {
-      console.log(`[dsh-safe] "${bad}" already disabled but boot still failed; giving up.`)
-      console.log(result.err.slice(0, 2000))
+      console.warn(`${Y}[WARNING]${Z} [dsh-safe] "${bad}" already disabled but boot still failed; giving up.`)
+      console.warn(result.err.slice(0, 2000))
+      console.warn(`${Y}[WARNING]${Z} [dsh-safe] hint: Check ${GUARD_FILE} for stale rows and ${INCIDENT_FILE}; the failure may come from another plugin — disable suspects and reboot.`)
       break
     }
     const isolated = isolate(GUARD_FILE, bad)

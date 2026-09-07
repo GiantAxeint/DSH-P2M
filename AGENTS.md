@@ -35,6 +35,7 @@
 2. **"export 缺失 / does not provide an export" ≠ 缺包**：很可能是解析目标版本不对——profile 本地实体丢失后 Node 沿目录**向上爬升**命中全局 CLI 内置包（如 dsh-settings@0.1.2-alpha.3 移除旧导出）。排查用 `createRequire(path.join(profileDir, '__p2m__.cjs')).resolve(spec)` 实证解析落点与版本；修复：在 profile 显式钉版本（`pnpm add <spec>@<兼容版>`）让本地实体优先。
 3. **"service X has been registered" ≠ 依赖又坏了**：是补丁层把**出厂默认 disabled 的条目**（常是"默认后端替代品"，如 morlay RDB 三件套）通过 profile 整批 `disabled:false` 唤醒了。修复是**二选一**：改回 disabled:true，或连官方默认后端一并禁用——不要两个都开。
 4. cordis 服务注册字面量只有两类：Service 子类 `super(ctx, name)` 与 `ctx.provide(name, …)`；名字常写在一跳依赖基类包里（`sessionPersistence` 实际在 `@deepseek-ai/dsh-session-persistence`）——所以 C7 扫描连带扫一跳依赖包。
+5. **读 p2m 日志先看前缀与颜色**（v0.1.7+，规则见 README「日志显示规则」）：`[WARNING]`（黄）= 不中断但需关注（resolve drift / preflight 越界 / 静态冲突）；`[ERROR]`（红）= 中断或内部异常；每条后必有缩进英文 `hint:` 指明该查哪个文件/路径。hint 路径若显示 `process.cwd()` 而非 profile 路径，说明 loader.ctx.baseUrl 未传入（冒烟/测试环境），真实 DSH 总是 profile 根。
 
 ## 纪律摘要（agent-coding-discipline 五律）
 

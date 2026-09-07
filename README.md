@@ -94,6 +94,30 @@ P2M 启动后自动工作；状态与数据落在 `<DSH_HOME>/p2m/`（默认 `~/
 - **排查时怎么用**：N 连续递增 = P2M 每次启动都在正常工作；若两次启动间 N 不变，说明那次 P2M 根本没被加载（被禁用/未启用）；事故发生时可用 N 对齐 `incidents.jsonl` 的时间线（例如「第 11 次启动崩」→ 看该次 boot 前后的流水）。
 - **清零重计**：删掉 `state.json` 中的 `bootCount` 字段或整个文件即可（P2M 自动重建，不影响 guard/usage/incidents）。
 
+### 日志显示规则（级别与配色）
+
+P2M 日志分为三级，规则如下：
+
+| 级别 | 前缀 | 配色 | 何时出现 |
+| --- | --- | --- | --- |
+| info | 无 | 无色 | 正常动作：boot、隔离、启用、对账决策等 |
+| **提示类** | `[WARNING]` | **黄色** | 未中断 DSH 启动、但需关注的问题：resolve drift、preflight peer 越界、静态扫描冲突、self-heal、loader 不可用等 |
+| **中断/异常类** | `[ERROR]` | **红色** | 已中断或内部异常：protected 条目被自动禁用、p2m 内部错误等 |
+
+- **每条 `[WARNING]` / `[ERROR]` 之后都附带一行缩进的英文 `hint:`**——说明应检查的具体文件、路径或冲突细节（如 `~/.dsh/p2m/incidents.jsonl`、profile `package.json`、guard 文件）。
+- 从属细节行（如具体 bundle 的 declared/resolved 对比、fix 命令）缩进显示、不重复前缀。
+- **配色自适应**：stderr 非 TTY（日志重定向/管道）或设置了 `NO_COLOR` 时自动退化为无色文本，避免日志文件残留 ANSI 转义码；需强制颜色时配置 `logColor: 'always'`（或 `'never'` 关闭）。
+
+示例（preflight 发现问题时）：
+
+```
+[WARNING] [p2m] preflight: 2 peer violation(s) — 建议先按下方 fix 命令钉版本，再重启 DSH
+    @foo/bar peer @deepseek-ai/dsh-settings: declared ^0.1.1-rc.2, resolved 0.1.2-rc.1 | fix: pnpm add @deepseek-ai/dsh-settings@^0.1.1-rc.2
+    hint: Check the peer ranges declared in <profile>/package.json against the resolved versions above, then run the fix command (pnpm add ...) inside the profile before restarting DSH.
+```
+
+launcher（`DSH-safe.cmd` → `dsh-safe.mjs`）输出遵循同一套规则。
+
 ### ctx.p2m API（运行期可调）
 
 | 方法 | 作用 |
@@ -129,6 +153,7 @@ P2M 启动后自动工作；状态与数据落在 `<DSH_HOME>/p2m/`（默认 `~/
 | `preflightOnBoot` | true | E3：boot 时跑 peer 版本体检（只报告） |
 | `scanBootLayers` | true | E4：boot 静态扫描全补丁层（自动发现） |
 | `patchLayers` | [] | `scanConflicts()` 额外扫描的补丁文件（缺省自动发现） |
+| `logColor` | 'auto' | 日志配色：auto（TTY 且无 NO_COLOR 才着色）/ always / never |
 
 ## 冲突类型速查
 
@@ -188,6 +213,7 @@ DSH-P2M/
 | v0.1.5（E3） | 启动前 peer 版本体检（p2m boot + launcher 内嵌，`DSH_P2M_PREFLIGHT=block` 可拒启） |
 | v0.1.6（E4） | profile 层覆盖感知：出厂禁用被覆盖 → 二选一建议；C4 误报修正；boot 静态扫描全补丁层 |
 | v0.1.6（E5） | 本文档体系同步（DESIGN §14 / 速查表 / AGENTS 心法 / 复盘 HTML） |
+| v0.1.7 | 日志分级与显示规则：提示类 `[WARNING]` 黄色 / 中断及内部异常类 `[ERROR]` 红色，尾部附全英文 `hint:` 检查指引（含 launcher 同步）；preflight 提示文案优化；`logColor` 配置 |
 
 > 完整背景与逐项说明见 [docs/incident-2026-09-06.html](./docs/incident-2026-09-06.html)（冲突事件复盘）与 [DESIGN.md](./DESIGN.md#14-事件驱动增强-e1e5)。
 

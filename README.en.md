@@ -91,6 +91,30 @@ Every time DSH starts and loads P2M, the log shows a line with a number N (e.g. 
 - **How to use it when debugging**: N increasing steadily means P2M is running on every startup; if N did not change between two startups, P2M was not loaded at all that time (disabled / not enabled). When an incident happens, align N with the `incidents.jsonl` timeline (e.g. "crashed on boot #11" → inspect incidents around that boot).
 - **Reset the counter**: delete the `bootCount` field (or the whole file) from `state.json` — P2M recreates it automatically; guard/usage/incidents are untouched.
 
+### Log display rules (levels & colors)
+
+P2M logs have three levels:
+
+| Level | Prefix | Color | When |
+| --- | --- | --- | --- |
+| info | — | none | normal actions: boot, isolate, enable, reconcile decisions |
+| **Advisory** | `[WARNING]` | **yellow** | non-fatal issues that need attention: resolve drift, preflight peer violations, static-scan conflicts, self-heal, loader unavailable |
+| **Fatal / internal** | `[ERROR]` | **red** | interrupted or internal failures: a protected entry auto-disabled by the loader, p2m internal errors |
+
+- **Every `[WARNING]` / `[ERROR]` is followed by an indented English `hint:` line** telling you which file/path to check or what the conflict is about (e.g. `~/.dsh/p2m/incidents.jsonl`, the profile `package.json`, the guard file).
+- Sub-detail lines (per-bundle declared/resolved comparison, fix commands) are indented without repeating the prefix.
+- **Colors adapt automatically**: they degrade to plain text when stderr is not a TTY (redirected/piped logs) or when `NO_COLOR` is set, so log files never contain ANSI escape garbage; force colors with `logColor: 'always'` (or disable with `'never'`).
+
+Example (preflight violations found):
+
+```
+[WARNING] [p2m] preflight: 2 peer violation(s) — 建议先按下方 fix 命令钉版本，再重启 DSH
+    @foo/bar peer @deepseek-ai/dsh-settings: declared ^0.1.1-rc.2, resolved 0.1.2-rc.1 | fix: pnpm add @deepseek-ai/dsh-settings@^0.1.1-rc.2
+    hint: Check the peer ranges declared in <profile>/package.json against the resolved versions above, then run the fix command (pnpm add ...) inside the profile before restarting DSH.
+```
+
+The launcher (`DSH-safe.cmd` → `dsh-safe.mjs`) follows the same rules.
+
 ### ctx.p2m API
 
 | Method | Purpose |
@@ -126,6 +150,7 @@ Every time DSH starts and loads P2M, the log shows a line with a number N (e.g. 
 | `preflightOnBoot` | true | E3: run peer preflight at boot (report only) |
 | `scanBootLayers` | true | E4: static-scan all patch layers at boot |
 | `patchLayers` | [] | extra patch files for `scanConflicts()` (auto-discovered by default) |
+| `logColor` | 'auto' | log colors: auto (TTY & no NO_COLOR) / always / never |
 
 ## Conflict types at a glance
 
